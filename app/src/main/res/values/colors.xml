@@ -1,5 +1,15 @@
 <resources>
- <color name="green">#087F5B</color><color name="green_dark">#056044</color><color name="green_light">#E8F5EF</color>
- <color name="text">#173126</color><color name="muted">#65756E</color><color name="white">#FFFFFF</color>
- <color name="red">#C62828</color><color name="orange">#EF8F00</color>
+    <color name="green">#087F5B</color>
+    <color name="green_dark">#056044</color>
+    <color name="green_light">#E8F5EF</color>
+
+    <color name="text">#173126</color>
+    <color name="muted">#65756E</color>
+    <color name="white">#FFFFFF</color>
+
+    <color name="red">#C62828</color>
+    <color name="orange">#EF8F00</color>
+
+    <!-- Launcher icon background -->
+    <color name="icon_background">#087F5B</color>
 </resources>
