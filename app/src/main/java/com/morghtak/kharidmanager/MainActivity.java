@@ -12,7 +12,6 @@ import android.view.*;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
 import android.text.*;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.FileProvider;
 import org.json.*;
 import java.io.*;
@@ -25,244 +24,155 @@ public class MainActivity extends Activity {
     Spinner buyerSp, commoditySp, paymentSp, companySp;
     final ArrayDeque<Runnable> history = new ArrayDeque<>();
     Runnable currentPage;
-    boolean restoring = false;
+    final String[] labels = {"نام خریدار","نهاده","شماره خرید","وزن (کیلوگرم)","فی (ریال)","نوع پرداخت","مبلغ خرید (ریال)","تاریخ خرید","مقدار ذرت (کیلوگرم)","مقدار سویا (کیلوگرم)","نام شرکت","تاریخ اصلی سررسید"};
+    final String[] keys = {"buyer","commodity","purchaseNo","weight","fee","payment","amount","buyDate","corn","soy","company","mainDue"};
 
-    final String[] labels = {
-            "نام خریدار", "نهاده", "شماره خرید", "وزن (کیلوگرم)",
-            "فی (ریال)", "قیمت توافقی (ریال)", "نوع پرداخت", "مبلغ خرید (ریال)",
-            "تاریخ خرید", "مقدار ذرت (کیلوگرم)", "مقدار سویا (کیلوگرم)", "نام شرکت",
-            "تاریخ اصلی سررسید", "تاریخ فرعی سررسید"
-    };
-
-    @Override public void onCreate(Bundle b) {
-        super.onCreate(b);
-        data = AppData.root(this);
-        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 22);
-        openPage(() -> home(), false);
+    @Override public void onCreate(Bundle b){
+        super.onCreate(b); data=AppData.root(this);
+        if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},22);
+        String id=getIntent().getStringExtra("openPurchaseId");
+        if(id!=null) { JSONObject p=findPurchase(id); if(p!=null) details(p); else home(); }
+        else openPage(()->home(),false);
     }
-
-    void openPage(Runnable page) { openPage(page, true); }
-    void openPage(Runnable page, boolean push) {
-        if (page == null) return;
-        if (push && currentPage != null && !restoring) history.push(currentPage);
-        currentPage = page;
-        page.run();
-    }
-    void goBackPage() {
-        if (!history.isEmpty()) {
-            Runnable p = history.pop();
-            restoring = true;
-            currentPage = p;
-            p.run();
-            restoring = false;
-        } else {
-            finish();
-        }
-    }
-    void goHome() {
-        history.clear();
-        openPage(() -> home(), false);
-    }
-    @Override public void onBackPressed() {
-        if (!history.isEmpty()) goBackPage(); else super.onBackPressed();
-    }
-
-    TextView tv(String s, int size) {
-        TextView t = new TextView(this);
-        t.setText(s); t.setTextSize(size); t.setPadding(18, 12, 18, 12);
-        return t;
-    }
-    Button btn(String s) {
-        Button b = new Button(this); b.setText(s); b.setAllCaps(false); return b;
-    }
-    void base(String title) {
-        root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-        TextView h = tv(title, 21); h.setTextColor(Color.WHITE); h.setGravity(Gravity.CENTER);
-        root.addView(h, new LinearLayout.LayoutParams(-1, UiManager.dp(this, 64)));
-        setContentView(root);
-    }
-    void finishScreen(String title) {
-        UiManager.decorate(this, root, title);
-        hideKeyboard();
-    }
-    void hideKeyboard() {
-        try { ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(root.getWindowToken(),0); } catch(Exception ignored) {}
-    }
-    void addView(View v) { root.addView(v, new LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT)); }
-
-    void home() {
-        base("مدیریت خرید و سررسید");
-        TextView summary = tv("", 16); addView(summary);
-        JSONArray p = AppData.arr(data,"purchases"); int due=0;
-        for(int i=0;i<p.length();i++) if(isSoon(p.optJSONObject(i))) due++;
-        summary.setText("تعداد خریدهای ثبت‌شده: " + p.length() + "\nسررسیدهای نزدیک: " + due);
-
-        Button n=btn("➕ ثبت خرید جدید"); n.setOnClickListener(v->openPage(()->form(null))); addView(n);
-        Button l=btn("🛒 خریدهای ثبت‌شده"); l.setOnClickListener(v->openPage(()->listPurchases(null))); addView(l);
-        Button b=btn("👤 خریداران و پرونده هر خریدار"); b.setOnClickListener(v->openPage(()->buyersPage())); addView(b);
-        Button r=btn("🔔 سررسیدها"); r.setOnClickListener(v->openPage(()->deadlines())); addView(r);
-        Button c=btn("🏢 شرکت‌ها"); c.setOnClickListener(v->openPage(()->manage("companies","شرکت‌ها"))); addView(c);
-        Button m=btn("🌾 نهاده‌ها"); m.setOnClickListener(v->openPage(()->manage("commodities","نهاده‌ها"))); addView(m);
-        Button rep=btn("📊 گزارش‌ها و خروجی Excel"); rep.setOnClickListener(v->openPage(()->reports())); addView(rep);
-        Button bk=btn("💾 پشتیبان‌گیری / بازیابی"); bk.setOnClickListener(v->openPage(()->backup())); addView(bk);
+    @Override protected void onNewIntent(Intent i){super.onNewIntent(i);setIntent(i);AlarmReceiver.stopSound();String id=i.getStringExtra("openPurchaseId");if(id!=null){JSONObject p=findPurchase(id);if(p!=null)details(p);}}
+    void openPage(Runnable page){openPage(page,true);}
+    void openPage(Runnable page,boolean push){if(page==null)return;if(push&&currentPage!=null)history.push(currentPage);currentPage=page;page.run();}
+    void back(){if(!history.isEmpty()){Runnable p=history.pop();currentPage=p;p.run();}else finish();}
+    void goHome(){history.clear();currentPage=()->home();home();}
+    void home(){history.clear();base("مدیریت خرید و سررسید");TextView s=tv("",16);add(s);JSONArray a=AppData.arr(data,"purchases");int open=0;for(int i=0;i<a.length();i++)if(!a.optJSONObject(i).optBoolean("collected",false))open++;s.setText("تعداد خریدها: "+a.length()+"\nخریدهای در انتظار وصول: "+open);
+        Button b=btn("➕ ثبت خرید جدید");b.setOnClickListener(v->openPage(()->form(null)));add(b);
+        b=btn("🛒 خریدهای ثبت‌شده");b.setOnClickListener(v->openPage(()->listPurchases(null)));add(b);
+        b=btn("👤 خریداران و پرونده هر خریدار");b.setOnClickListener(v->openPage(this::buyersPage));add(b);
+        b=btn("🔔 سررسیدها");b.setOnClickListener(v->openPage(this::deadlines));add(b);
+        b=btn("🏢 شرکت‌ها");b.setOnClickListener(v->openPage(()->manage("companies","شرکت‌ها")));add(b);
+        b=btn("🌾 نهاده‌ها");b.setOnClickListener(v->openPage(()->manage("commodities","نهاده‌ها")));add(b);
+        b=btn("📊 گزارش‌ها و خروجی Excel");b.setOnClickListener(v->openPage(this::reports));add(b);
+        b=btn("💾 پشتیبان‌گیری / بازیابی");b.setOnClickListener(v->openPage(this::backup));add(b);
         finishScreen("مدیریت خرید و سررسید");
     }
-
-    boolean isSoon(JSONObject p) {
-        if(p==null) return false; String d=p.optString("subDue",""); if(d.isEmpty()) return false;
-        long m=PersianDate.millis(d,"23:59"); return m>System.currentTimeMillis() && m-System.currentTimeMillis()<7L*86400000L;
-    }
-
-    EditText input(String hint) {
-        EditText e=new EditText(this); e.setHint(hint); e.setSingleLine(true); e.setPadding(16,8,16,8);
-        e.setTextSize(UiManager.fieldSize(this));
-        inputs.add(e); addView(e); return e;
-    }
-    void addLabel(String s){ addView(tv(s,14)); }
-
-    void form(JSONObject old) {
-        base(old==null?"ثبت خرید جدید":"ویرایش خرید"); inputs.clear(); JSONObject p=old;
-        for(int i=0;i<labels.length;i++){
-            addLabel((i+1)+". "+labels[i]);
-            if(i==0){ buyerSp=spinner(AppData.arr(data,"buyers")); addView(buyerSp); addHidden(); }
-            else if(i==1){ commoditySp=spinner(AppData.arr(data,"commodities")); addView(commoditySp); addHidden(); }
-            else if(i==6){ paymentSp=spinner(AppData.PAYMENTS); addView(paymentSp); addHidden(); }
-            else if(i==11){ companySp=spinner(AppData.arr(data,"companies")); addView(companySp); addHidden(); }
-            else {
-                EditText e=input(labels[i]);
-                if(i==8||i==12||i==13) e.setOnClickListener(v->pickDate(e));
-                if(i==3||i==4||i==5||i==7||i==9||i==10){ e.setInputType(2); addGrouping(e); }
-            }
-        }
-        if(p!=null) fill(p); else if(inputs.size()>8) inputs.get(8).setText(PersianDate.today());
-        Button alarm=btn("🔔 تنظیم هشدار تاریخ فرعی"); alarm.setOnClickListener(v->alarmDialog(inputs.get(13),p)); addView(alarm);
-        Button save=btn("✓ ذخیره خرید"); save.setOnClickListener(v->savePurchase(old)); addView(save);
-        Button back=btn("← بازگشت"); back.setOnClickListener(v->goBackPage()); addView(back);
-        finishScreen(old==null?"ثبت خرید جدید":"ویرایش خرید");
-    }
-    void addHidden(){ EditText e=new EditText(this); e.setVisibility(View.GONE); inputs.add(e); }
-
-    Spinner spinner(JSONArray a){ ArrayList<String>x=new ArrayList<>(); for(int i=0;i<a.length();i++)x.add(a.optString(i)); return spinner(x.toArray(new String[0])); }
-    Spinner spinner(String[] a){ Spinner s=new Spinner(this); s.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,a)); return s; }
-    void setSpinner(Spinner s,String v){ if(s==null)return; for(int i=0;i<s.getCount();i++) if(String.valueOf(s.getItemAtPosition(i)).equals(v)){s.setSelection(i);break;} }
-    void addGrouping(final EditText e){ e.addTextChangedListener(new TextWatcher(){boolean busy; public void beforeTextChanged(CharSequence s,int st,int c,int a){} public void onTextChanged(CharSequence s,int st,int b,int c){} public void afterTextChanged(Editable ed){if(busy)return;String raw=AppData.digits(ed.toString());if(raw.isEmpty())return;busy=true;String f=AppData.fmt(raw);e.setText(f);e.setSelection(f.length());busy=false;}}); }
-
+    void base(String title){root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);TextView h=tv(title,21);h.setGravity(Gravity.CENTER);root.addView(h,new LinearLayout.LayoutParams(-1,UiManager.dp(this,64)));setContentView(root);}
+    void finishScreen(String title){UiManager.decorate(this,root,title);hideKeyboard();}
+    void hideKeyboard(){try{((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(root.getWindowToken(),0);}catch(Exception ignored){}}
+    void add(View v){root.addView(v,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));}
+    TextView tv(String s,int z){TextView t=new TextView(this);t.setText(s);t.setTextSize(z);t.setPadding(18,12,18,12);return t;}
+    Button btn(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);return b;}
+    EditText input(String hint){EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));e.setPadding(14,8,14,8);inputs.add(e);add(e);return e;}
+    void label(String s){add(tv(s,14));}
+    Spinner spinner(JSONArray a){ArrayList<String>x=new ArrayList<>();for(int i=0;i<a.length();i++)x.add(a.optString(i));return spinner(x.toArray(new String[0]));}
+    Spinner spinner(String[] a){Spinner s=new Spinner(this);s.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,a));return s;}
+    void setSpinner(Spinner s,String v){if(s==null)return;for(int i=0;i<s.getCount();i++)if(String.valueOf(s.getItemAtPosition(i)).equals(v)){s.setSelection(i);break;}}
+    void hidden(){EditText e=new EditText(this);e.setVisibility(View.GONE);inputs.add(e);}
+    void addGrouping(EditText e){e.addTextChangedListener(new TextWatcher(){boolean busy;public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){}public void afterTextChanged(Editable ed){if(busy)return;String r=AppData.digits(ed.toString());if(r.isEmpty())return;busy=true;String f=AppData.fmt(r);e.setText(f);e.setSelection(f.length());busy=false;}});}
     void pickDate(EditText e){
-        LinearLayout l=new LinearLayout(this); l.setPadding(16,8,16,8);
-        EditText y=new EditText(this),m=new EditText(this),d=new EditText(this); y.setHint("سال");m.setHint("ماه");d.setHint("روز");
+        LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.HORIZONTAL);l.setPadding(10,5,10,5);
+        EditText y=new EditText(this),m=new EditText(this),d=new EditText(this);y.setHint("سال");m.setHint("ماه");d.setHint("روز");
         for(EditText x:new EditText[]{y,m,d}){x.setInputType(2);l.addView(x,new LinearLayout.LayoutParams(0,60,1));}
-        new AlertDialog.Builder(this).setTitle("انتخاب تاریخ شمسی").setView(l).setPositiveButton("تأیید",(di,w)->{try{String ys=y.getText().toString().trim();if(ys.isEmpty())ys=PersianDate.today().substring(0,4);String ms=m.getText().toString().trim();if(ms.isEmpty())ms="01";String ds=d.getText().toString().trim();if(ds.isEmpty())ds="01";e.setText(String.format(Locale.US,"%s/%02d/%02d",ys,Integer.parseInt(ms),Integer.parseInt(ds)));}catch(Exception ignored){Toast.makeText(this,"تاریخ واردشده معتبر نیست",Toast.LENGTH_SHORT).show();}}).setNegativeButton("لغو",null).show();
+        new AlertDialog.Builder(this).setTitle("انتخاب تاریخ شمسی").setView(l).setPositiveButton("تأیید",(di,w)->{try{String ys=y.getText().toString().trim(),ms=m.getText().toString().trim(),ds=d.getText().toString().trim();if(ys.isEmpty())ys=PersianDate.today().substring(0,4);if(ms.isEmpty())ms="01";if(ds.isEmpty())ds="01";int mi=Integer.parseInt(ms),da=Integer.parseInt(ds);if(mi<1||mi>12||da<1||da>31)throw new Exception();e.setText(String.format(Locale.US,"%s/%02d/%02d",ys,mi,da));}catch(Exception ex){Toast.makeText(this,"تاریخ واردشده معتبر نیست",Toast.LENGTH_SHORT).show();}}).setNegativeButton("لغو",null).show();
     }
-
-    void fill(JSONObject p){
-        String[] k={"buyer","commodity","purchaseNo","weight","fee","agreed","payment","amount","buyDate","corn","soy","company","mainDue","subDue"};
-        for(int i=0;i<k.length;i++) if(i!=0&&i!=1&&i!=6&&i!=11) inputs.get(i).setText(p.optString(k[i],""));
-        setSpinner(buyerSp,p.optString("buyer")); setSpinner(commoditySp,p.optString("commodity")); setSpinner(paymentSp,p.optString("payment")); setSpinner(companySp,p.optString("company"));
+    void form(JSONObject old){
+        base(old==null?"ثبت خرید جدید":"ویرایش خرید");inputs.clear();
+        for(int i=0;i<labels.length;i++){
+            label((i+1)+". "+labels[i]);
+            if(i==0){buyerSp=spinner(AppData.arr(data,"buyers"));add(buyerSp);hidden();}
+            else if(i==1){commoditySp=spinner(AppData.arr(data,"commodities"));add(commoditySp);hidden();}
+            else if(i==5){paymentSp=spinner(AppData.PAYMENTS);add(paymentSp);hidden();}
+            else if(i==10){companySp=spinner(AppData.arr(data,"companies"));add(companySp);hidden();}
+            else {EditText e=input(labels[i]);if(i==7||i==11)e.setOnClickListener(v->pickDate(e));if(i==3||i==4||i==6||i==8||i==9){e.setInputType(2);addGrouping(e);}}
+        }
+        // amount is calculated automatically
+        inputs.get(6).setFocusable(false);inputs.get(6).setClickable(false);
+        TextView calc=tv("مبلغ خرید = وزن × فی (محاسبه خودکار)",13);add(calc);
+        TextWatcher calcW=new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){}public void afterTextChanged(Editable e){calcAmount();}};
+        inputs.get(3).addTextChangedListener(calcW);inputs.get(4).addTextChangedListener(calcW);
+        if(old!=null)fill(old);else inputs.get(7).setText(PersianDate.today());
+        add(tv("وضعیت خرید",16));
+        CheckBox collected=new CheckBox(this);collected.setText("☑ وصول شد");collected.setChecked(old!=null&&old.optBoolean("collected",false));add(collected);
+        CheckBox allocated=new CheckBox(this);allocated.setText("☑ تخصیص شد");allocated.setChecked(old!=null&&old.optBoolean("allocated",false));add(allocated);
+        add(tv("هشدار سررسید اصلی",16));
+        CheckBox alarm=new CheckBox(this);alarm.setText("فعال کردن هشدار");alarm.setChecked(old!=null&&old.optBoolean("alarm",false));add(alarm);
+        LinearLayout al=new LinearLayout(this);al.setOrientation(LinearLayout.VERTICAL);add(al);
+        EditText days=new EditText(this);days.setHint("چند روز قبل از سررسید؟");days.setInputType(2);al.addView(days);
+        EditText time=new EditText(this);time.setHint("ساعت هشدار مثل 10:00");time.setSingleLine(true);al.addView(time);
+        Spinner repeat=spinner(new String[]{"فقط یک بار","هر روز تا زمان وصول"});al.addView(repeat);
+        TextView preview=tv("هشدار تنظیم نشده است",13);al.addView(preview);
+        if(old!=null){days.setText(""+old.optInt("alarmDays",1));time.setText(old.optString("alarmTime","10:00"));repeat.setSelection(old.optBoolean("alarmRepeat",false)?1:0);updateAlarmPreview(preview,old.optString("mainDue"),days.getText().toString(),time.getText().toString(),alarm.isChecked());}
+        TextWatcher aw=new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){updateAlarmPreview(preview,inputs.get(11).getText().toString(),days.getText().toString(),time.getText().toString(),alarm.isChecked());}public void afterTextChanged(Editable e){}};
+        days.addTextChangedListener(aw);time.addTextChangedListener(aw);inputs.get(11).addTextChangedListener(aw);alarm.setOnCheckedChangeListener((b,v)->updateAlarmPreview(preview,inputs.get(11).getText().toString(),days.getText().toString(),time.getText().toString(),v));
+        Button clear=btn("🔕 حذف هشدار");clear.setOnClickListener(v->{alarm.setChecked(false);if(old!=null){old.remove("alarm");old.remove("alarmRepeat");cancelAlarm(this,old);}});add(clear);
+        Button save=btn("✓ ذخیره خرید و هشدار");save.setOnClickListener(v->savePurchase(old,collected.isChecked(),allocated.isChecked(),alarm.isChecked(),days.getText().toString(),time.getText().toString(),repeat.getSelectedItemPosition()==1));add(save);
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen(old==null?"ثبت خرید جدید":"ویرایش خرید");
     }
-
-    void savePurchase(JSONObject old){
+    void calcAmount(){try{long w=Long.parseLong(AppData.digits(inputs.get(3).getText().toString()));long f=Long.parseLong(AppData.digits(inputs.get(4).getText().toString()));inputs.get(6).setText(AppData.fmt(""+(w*f)));}catch(Exception ignored){inputs.get(6).setText("");}}
+    void updateAlarmPreview(TextView v,String due,String days,String time,boolean on){if(!on){v.setText("هشدار تنظیم نشده است");return;}try{int n=Integer.parseInt(days);v.setText("🔔 هشدار: "+due+" ، "+n+" روز قبل، ساعت "+time); }catch(Exception e){v.setText("🔔 تنظیم هشدار را کامل کنید");}}
+    void fill(JSONObject p){for(int i=0;i<keys.length;i++)if(i!=0&&i!=1&&i!=5&&i!=10)inputs.get(i).setText(p.optString(keys[i],""));setSpinner(buyerSp,p.optString("buyer"));setSpinner(commoditySp,p.optString("commodity"));setSpinner(paymentSp,p.optString("payment"));setSpinner(companySp,p.optString("company"));calcAmount();}
+    void savePurchase(JSONObject old,boolean collected,boolean allocated,boolean alarm, String ds,String tm,boolean repeat){
         try{
-            JSONObject r=new JSONObject();
-            String[] k={"buyer","commodity","purchaseNo","weight","fee","agreed","payment","amount","buyDate","corn","soy","company","mainDue","subDue"};
-            for(int i=0;i<k.length;i++){
-                String v=inputs.get(i).getText().toString();
-                if(i==0)v=buyerSp==null?"":String.valueOf(buyerSp.getSelectedItem());
-                if(i==1)v=commoditySp==null?"":String.valueOf(commoditySp.getSelectedItem());
-                if(i==6)v=paymentSp==null?"":String.valueOf(paymentSp.getSelectedItem());
-                if(i==11)v=companySp==null?"":String.valueOf(companySp.getSelectedItem());
-                r.put(k[i],v);
-            }
+            JSONObject r=new JSONObject();for(int i=0;i<keys.length;i++){String v=inputs.get(i).getText().toString();if(i==0)v=String.valueOf(buyerSp.getSelectedItem());if(i==1)v=String.valueOf(commoditySp.getSelectedItem());if(i==5)v=String.valueOf(paymentSp.getSelectedItem());if(i==10)v=String.valueOf(companySp.getSelectedItem());r.put(keys[i],v);}
             if(r.optString("buyer").trim().isEmpty()){Toast.makeText(this,"نام خریدار را انتخاب کنید",Toast.LENGTH_SHORT).show();return;}
-            r.put("id",old==null?UUID.randomUUID().toString():old.optString("id"));
-            r.put("alarm",old!=null&&old.optBoolean("alarm",false)); r.put("alarmDays",old==null?1:old.optInt("alarmDays",1)); r.put("alarmTime",old==null?"10:00":old.optString("alarmTime","10:00"));
-            JSONArray a=AppData.arr(data,"purchases"); boolean replaced=false;
-            if(old!=null) for(int i=0;i<a.length();i++) if(a.getJSONObject(i).optString("id").equals(r.optString("id"))){a.put(i,r);replaced=true;break;}
-            if(!replaced)a.put(r); data.put("purchases",a);
-            addUnique("buyers",r.optString("buyer")); addUnique("companies",r.optString("company")); AppData.save(this,data);
-            if(r.optBoolean("alarm"))schedule(this,r);
-            Toast.makeText(this,"خرید با موفقیت ذخیره شد",Toast.LENGTH_SHORT).show(); goHome();
+            if(r.optString("purchaseNo").trim().isEmpty()){Toast.makeText(this,"شماره خرید را وارد کنید",Toast.LENGTH_SHORT).show();return;}
+            r.put("id",old==null?UUID.randomUUID().toString():old.optString("id"));r.put("collected",collected);r.put("allocated",allocated);r.put("alarm",alarm);r.put("alarmDays",parseInt(ds,1));r.put("alarmTime",tm.trim().isEmpty()?"10:00":tm.trim());r.put("alarmRepeat",repeat);
+            JSONArray a=AppData.arr(data,"purchases");boolean replaced=false;for(int i=0;i<a.length();i++)if(a.optJSONObject(i).optString("id").equals(r.optString("id"))){a.put(i,r);replaced=true;break;}if(!replaced)a.put(r);data.put("purchases",a);addUnique("buyers",r.optString("buyer"));addUnique("companies",r.optString("company"));AppData.save(this,data);
+            if(alarm) schedule(this,r); else cancelAlarm(this,r);
+            Toast.makeText(this,"خرید و تنظیمات آن ذخیره شد",Toast.LENGTH_SHORT).show();goHome();
         }catch(Exception e){Toast.makeText(this,"خطا در ذخیره اطلاعات",Toast.LENGTH_LONG).show();}
     }
+    int parseInt(String s,int d){try{return Integer.parseInt(s.trim());}catch(Exception e){return d;}}
     void addUnique(String key,String val)throws Exception{if(val==null||val.trim().isEmpty())return;JSONArray a=AppData.arr(data,key);for(int i=0;i<a.length();i++)if(a.optString(i).equals(val))return;a.put(val);}
-
+    boolean isSoon(JSONObject p){String d=p==null?"":p.optString("mainDue");if(d.isEmpty()||p.optBoolean("collected",false))return false;long m=PersianDate.millis(d,"23:59");return m>=System.currentTimeMillis()&&m-System.currentTimeMillis()<7L*86400000L;}
     void listPurchases(String fixedBuyer){
-        base(fixedBuyer==null?"خریدهای ثبت‌شده":"خریدهای "+fixedBuyer);
-        EditText q=input("جستجو: نام، شماره خرید، شرکت یا نهاده");
-        LinearLayout dates=new LinearLayout(this); dates.setOrientation(LinearLayout.HORIZONTAL);
-        EditText from=new EditText(this),to=new EditText(this); from.setHint("از تاریخ");to.setHint("تا تاریخ");from.setSingleLine(true);to.setSingleLine(true);from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));
-        dates.addView(from,new LinearLayout.LayoutParams(0,60,1)); dates.addView(to,new LinearLayout.LayoutParams(0,60,1)); root.addView(dates);
-        Button go=btn("🔎 جستجو / فیلتر");addView(go);
-        LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);root.addView(list,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));
-        Runnable render=()->{
-            list.removeAllViews(); String s=q.getText().toString().trim(); String f=from.getText().toString().trim(),t=to.getText().toString().trim(); JSONArray a=AppData.arr(data,"purchases"); int count=0;
-            for(int i=a.length()-1;i>=0;i--){JSONObject p=a.optJSONObject(i);if(p==null)continue; if(fixedBuyer!=null&&!fixedBuyer.equals(p.optString("buyer")))continue;String blob=p.optString("buyer")+" "+p.optString("purchaseNo")+" "+p.optString("company")+" "+p.optString("commodity");if(!s.isEmpty()&&!blob.contains(s))continue;String d=p.optString("buyDate");if(!f.isEmpty()&&!d.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&!d.isEmpty()&&d.compareTo(t)>0)continue;count++;
-                LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(10,8,10,8);
-                Button b=btn("خرید شماره "+p.optString("purchaseNo")+"\n"+p.optString("buyer")+" | "+p.optString("commodity")+" | تاریخ "+p.optString("buyDate"));b.setOnClickListener(v->openPage(()->details(p)));card.addView(b);list.addView(card);
-            }
-            TextView total=tv("تعداد نتایج: "+count,15);list.addView(total,0);
-        };
-        go.setOnClickListener(v->render.run());render.run();
-        Button back=btn("← بازگشت");back.setOnClickListener(v->goBackPage());addView(back);
-        finishScreen(fixedBuyer==null?"خریدهای ثبت‌شده":"خریدهای "+fixedBuyer);
+        base(fixedBuyer==null?"خریدهای ثبت‌شده":"پرونده "+fixedBuyer);EditText q=input("جستجو: نام، شماره خرید، شرکت یا نهاده");LinearLayout ds=new LinearLayout(this);EditText from=new EditText(this),to=new EditText(this);from.setHint("از تاریخ");to.setHint("تا تاریخ");from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));ds.addView(from,new LinearLayout.LayoutParams(0,60,1));ds.addView(to,new LinearLayout.LayoutParams(0,60,1));add(ds);Button go=btn("🔎 جستجو / فیلتر");add(go);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
+        Runnable render=()->{list.removeAllViews();JSONArray a=sortedPurchases();String s=q.getText().toString().trim(),f=from.getText().toString(),t=to.getText().toString();for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;if(fixedBuyer!=null&&!fixedBuyer.equals(p.optString("buyer")))continue;String blob=p.optString("buyer")+" "+p.optString("purchaseNo")+" "+p.optString("company")+" "+p.optString("commodity");if(!s.isEmpty()&&!blob.contains(s))continue;if(!f.isEmpty()&&p.optString("buyDate").compareTo(f)<0)continue;if(!t.isEmpty()&&p.optString("buyDate").compareTo(t)>0)continue;Button b=btn("👤 "+p.optString("buyer")+"   |   خرید "+p.optString("purchaseNo")+"\nتاریخ خرید: "+p.optString("buyDate"));b.setOnClickListener(v->openPage(()->details(p)));list.addView(b);}};
+        go.setOnClickListener(v->render.run());render.run();Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("خریدهای ثبت‌شده");
     }
-
-    void buyersPage(){
-        base("خریداران"); EditText q=input("جستجوی نام خریدار"); Button go=btn("🔎 جستجو");addView(go);
-        LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);root.addView(list,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));
-        Runnable render=()->{list.removeAllViews();JSONArray buyers=AppData.arr(data,"buyers"),p=AppData.arr(data,"purchases");String s=q.getText().toString().trim();
-            for(int i=0;i<buyers.length();i++){String buyer=buyers.optString(i);if(!s.isEmpty()&&!buyer.contains(s))continue;int n=0;long total=0;for(int j=0;j<p.length();j++){JSONObject x=p.optJSONObject(j);if(x!=null&&buyer.equals(x.optString("buyer"))){n++;try{total+=Long.parseLong(AppData.digits(x.optString("amount","0")));}catch(Exception ignored){}}}
-                Button b=btn("👤 "+buyer+"\nتعداد خرید: "+n+" | مجموع مبلغ: "+AppData.fmt(""+total)+" ریال");b.setOnClickListener(v->openPage(()->listPurchases(buyer)));list.addView(b);
-            }
-        };go.setOnClickListener(v->render.run());render.run();
-        Button add=btn("➕ افزودن خریدار");add.setOnClickListener(v->addEntry("buyers","خریدار جدید",()->buyersPage()));addView(add);
-        Button back=btn("← بازگشت");back.setOnClickListener(v->goBackPage());addView(back);finishScreen("خریداران");
-    }
-
+    JSONArray sortedPurchases(){JSONArray src=AppData.arr(data,"purchases");ArrayList<JSONObject> l=new ArrayList<>();for(int i=0;i<src.length();i++)l.add(src.optJSONObject(i));Collections.sort(l,(a,b)->b.optString("buyDate").compareTo(a.optString("buyDate")));JSONArray r=new JSONArray();for(JSONObject p:l)r.put(p);return r;}
     void details(JSONObject p){
-        base("جزئیات کامل خرید");
-        TextView buyer=tv("👤 "+p.optString("buyer")+"\nشماره خرید: "+p.optString("purchaseNo"),19);addView(buyer);
-        String[] k={"buyer","commodity","purchaseNo","weight","fee","agreed","payment","amount","buyDate","corn","soy","company","mainDue","subDue"};
-        for(int i=0;i<labels.length;i++) addView(tv(labels[i]+": "+p.optString(k[i],"-"),16));
-        addView(tv("هشدار تاریخ فرعی: "+(p.optBoolean("alarm")?"فعال - "+p.optInt("alarmDays")+" روز قبل، ساعت "+p.optString("alarmTime"):"غیرفعال"),16));
-        Button ex=btn("📊 خروجی Excel همین سفارش");ex.setOnClickListener(v->exportExcel(new JSONArray().put(p),"purchase_"+p.optString("purchaseNo")));addView(ex);
-        Button ed=btn("✏️ ویرایش");ed.setOnClickListener(v->openPage(()->form(p)));addView(ed);
-        Button same=btn("👤 همه خریدهای این خریدار");same.setOnClickListener(v->openPage(()->listPurchases(p.optString("buyer"))));addView(same);
-        Button del=btn("🗑 حذف");del.setOnClickListener(v->confirmDelete(p));addView(del);
-        Button back=btn("← بازگشت");back.setOnClickListener(v->goBackPage());addView(back);finishScreen("جزئیات کامل خرید");
+        base("جزئیات کامل خرید");add(tv("👤 "+p.optString("buyer")+"\nشماره خرید: "+p.optString("purchaseNo"),19));
+        for(int i=0;i<keys.length;i++)add(tv(labels[i]+": "+p.optString(keys[i],"-"),15));
+        add(tv("وضعیت وصول: "+(p.optBoolean("collected")?"✅ وصول شد":"⏳ وصول نشده"),16));add(tv("وضعیت تخصیص: "+(p.optBoolean("allocated")?"✅ تخصیص شد":"⏳ تخصیص نشده"),16));
+        if(p.optBoolean("alarm"))add(tv("🔔 هشدار: "+p.optInt("alarmDays",1)+" روز قبل، ساعت "+p.optString("alarmTime")+" - "+(p.optBoolean("alarmRepeat")?"روزانه تا وصول":"یک‌بار"),15));
+        Button c=btn(p.optBoolean("collected")?"↩️ لغو وصول":"💰 وصول شد");c.setOnClickListener(v->{try{p.put("collected",!p.optBoolean("collected"));AppData.save(this,data);if(p.optBoolean("collected"))cancelAlarm(this,p);details(p);}catch(Exception ignored){}});add(c);
+        Button al=btn(p.optBoolean("allocated")?"↩️ لغو تخصیص":"📦 تخصیص شد");al.setOnClickListener(v->{try{p.put("allocated",!p.optBoolean("allocated"));AppData.save(this,data);details(p);}catch(Exception ignored){}});add(al);
+        Button rem=btn("🔕 حذف آلارم");rem.setOnClickListener(v->{try{p.put("alarm",false);AppData.save(this,data);cancelAlarm(this,p);details(p);}catch(Exception ignored){}});add(rem);
+        Button ex=btn("📊 خروجی Excel همین خرید");ex.setOnClickListener(v->exportExcel(new JSONArray().put(p),"purchase_"+p.optString("purchaseNo")));add(ex);
+        Button ed=btn("✏️ ویرایش");ed.setOnClickListener(v->openPage(()->form(p)));add(ed);
+        Button same=btn("👤 پرونده "+p.optString("buyer"));same.setOnClickListener(v->openPage(()->listPurchases(p.optString("buyer"))));add(same);
+        Button del=btn("🗑 حذف");del.setOnClickListener(v->confirmDelete(p));add(del);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("جزئیات کامل خرید");
     }
+    JSONObject findPurchase(String id){JSONArray a=AppData.arr(data,"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p!=null&&id.equals(p.optString("id")))return p;}return null;}
     void confirmDelete(JSONObject p){new AlertDialog.Builder(this).setTitle("حذف خرید").setMessage("این خرید حذف شود؟").setPositiveButton("حذف",(d,w)->delete(p)).setNegativeButton("لغو",null).show();}
-    void delete(JSONObject p){try{JSONArray a=AppData.arr(data,"purchases"),b=new JSONArray();for(int i=0;i<a.length();i++)if(!a.getJSONObject(i).optString("id").equals(p.optString("id")))b.put(a.getJSONObject(i));data.put("purchases",b);AppData.save(this,data);Toast.makeText(this,"خرید حذف شد",Toast.LENGTH_SHORT).show();goHome();}catch(Exception ignored){}}
-
+    void delete(JSONObject p){try{cancelAlarm(this,p);JSONArray a=AppData.arr(data,"purchases"),b=new JSONArray();for(int i=0;i<a.length();i++)if(!a.getJSONObject(i).optString("id").equals(p.optString("id")))b.put(a.getJSONObject(i));data.put("purchases",b);AppData.save(this,data);goHome();}catch(Exception ignored){}}
+    void buyersPage(){
+        base("خریداران و پرونده هر خریدار");EditText q=input("جستجوی نام خریدار");Button go=btn("🔎 جستجو");add(go);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
+        Runnable render=()->{list.removeAllViews();JSONArray b=AppData.arr(data,"buyers");String s=q.getText().toString().trim();for(int i=0;i<b.length();i++){String name=b.optString(i);if(!s.isEmpty()&&!name.contains(s))continue;Button x=btn("👤 "+name);x.setOnClickListener(v->openPage(()->buyerFile(name)));list.addView(x);}};go.setOnClickListener(v->render.run());render.run();Button addb=btn("➕ افزودن خریدار");addb.setOnClickListener(v->addEntry("buyers","خریدار جدید",this::buyersPage));add(addb);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("خریداران");
+    }
+    void buyerFile(String buyer){
+        base("پرونده خریدار: "+buyer);JSONArray a=AppData.arr(data,"purchases");int n=0,coll=0,alloc=0;long total=0,colAmt=0;StringBuilder noColl=new StringBuilder(),noAlloc=new StringBuilder();
+        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||!buyer.equals(p.optString("buyer")))continue;n++;long amt=toLong(p.optString("amount"));total+=amt;if(p.optBoolean("collected")){coll++;colAmt+=amt;}else{if(noColl.length()>0)noColl.append("، ");noColl.append(p.optString("purchaseNo"));}if(p.optBoolean("allocated"))alloc++;else{if(noAlloc.length()>0)noAlloc.append("، ");noAlloc.append(p.optString("purchaseNo"));}}
+        add(tv("آمار کل\nتعداد خرید: "+n+"\nمجموع مبلغ: "+AppData.fmt(""+total)+" ریال\nوصول‌شده: "+coll+" خرید، "+AppData.fmt(""+colAmt)+" ریال\nوصول‌نشده: "+(n-coll)+" خرید\nشماره‌های وصول‌نشده: "+(noColl.length()==0?"ندارد":noColl)+"\nتخصیص‌شده: "+alloc+" خرید\nتخصیص‌نشده: "+(n-alloc)+" خرید\nشماره‌های تخصیص‌نشده: "+(noAlloc.length()==0?"ندارد":noAlloc),15));
+        Button all=btn("📋 همه خریدهای این خریدار");all.setOnClickListener(v->openPage(()->listPurchases(buyer)));add(all);
+        Button stat=btn("📊 آمار بازه زمانی");stat.setOnClickListener(v->buyerStats(buyer));add(stat);
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده خریدار");
+    }
+    void buyerStats(String buyer){base("آمار بازه‌ای: "+buyer);EditText f=input("از تاریخ");EditText t=input("تا تاریخ");f.setOnClickListener(v->pickDate(f));t.setOnClickListener(v->pickDate(t));Button b=btn("نمایش آمار");add(b);TextView out=tv("",15);add(out);b.setOnClickListener(v->{int n=0,c=0,a=0;long total=0;JSONArray p=AppData.arr(data,"purchases");for(int i=0;i<p.length();i++){JSONObject x=p.optJSONObject(i);if(x==null||!buyer.equals(x.optString("buyer")))continue;String d=x.optString("buyDate");if(!f.getText().toString().isEmpty()&&d.compareTo(f.getText().toString())<0)continue;if(!t.getText().toString().isEmpty()&&d.compareTo(t.getText().toString())>0)continue;n++;total+=toLong(x.optString("amount"));if(x.optBoolean("collected"))c++;if(x.optBoolean("allocated"))a++;}out.setText("تعداد خرید: "+n+"\nمجموع مبلغ: "+AppData.fmt(""+total)+" ریال\nوصول‌شده: "+c+"\nتخصیص‌شده: "+a);});Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("آمار");}
+    long toLong(String s){try{return Long.parseLong(AppData.digits(s));}catch(Exception e){return 0;}}
     void deadlines(){
-        base("سررسیدها"); JSONArray a=AppData.arr(data,"purchases");
-        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String d=p.optString("subDue");if(d.isEmpty())continue;String status=isSoon(p)?"⚠ نزدیک سررسید":"";Button b=btn("خرید "+p.optString("purchaseNo")+" | "+p.optString("buyer")+"\nسررسید فرعی: "+d+"  "+status+"\n"+(p.optBoolean("alarm")?"🔔 آلارم فعال":"بدون آلارم"));b.setOnClickListener(v->openPage(()->details(p)));addView(b);}
-        Button back=btn("← بازگشت");back.setOnClickListener(v->goBackPage());addView(back);finishScreen("سررسیدها");
+        base("سررسیدها");add(tv("حالت نمایش",16));Spinner mode=spinner(new String[]{"نزدیک‌ترین سررسیدها","بازه تاریخی"});add(mode);LinearLayout dates=new LinearLayout(this);EditText f=new EditText(this),t=new EditText(this);f.setHint("از تاریخ");t.setHint("تا تاریخ");f.setOnClickListener(v->pickDate(f));t.setOnClickListener(v->pickDate(t));dates.addView(f,new LinearLayout.LayoutParams(0,60,1));dates.addView(t,new LinearLayout.LayoutParams(0,60,1));add(dates);Button show=btn("🔎 نمایش");add(show);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
+        Runnable render=()->{list.removeAllViews();ArrayList<JSONObject> l=new ArrayList<>();JSONArray a=AppData.arr(data,"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||p.optBoolean("collected")||p.optString("mainDue").isEmpty())continue;if(mode.getSelectedItemPosition()==1){if(!f.getText().toString().isEmpty()&&p.optString("mainDue").compareTo(f.getText().toString())<0)continue;if(!t.getText().toString().isEmpty()&&p.optString("mainDue").compareTo(t.getText().toString())>0)continue;}l.add(p);}Collections.sort(l,(x,y)->x.optString("mainDue").compareTo(y.optString("mainDue")));for(JSONObject p:l){Button b=btn("👤 "+p.optString("buyer")+" | خرید "+p.optString("purchaseNo")+"\nسررسید اصلی: "+p.optString("mainDue")+(isSoon(p)?"  ⚠ نزدیک":""));b.setOnClickListener(v->openPage(()->details(p)));list.addView(b);}};show.setOnClickListener(v->render.run());render.run();Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("سررسیدها");
     }
-
-    void manage(String key,String title){
-        base(title); JSONArray a=AppData.arr(data,key);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);root.addView(list,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));
-        for(int i=0;i<a.length();i++){final int ix=i;LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);TextView t=tv(a.optString(i),16);row.addView(t,new LinearLayout.LayoutParams(0,60,1));Button d=btn("حذف");d.setOnClickListener(v->{a.remove(ix);try{data.put(key,a);AppData.save(this,data);}catch(Exception ignored){}manage(key,title);});row.addView(d,new LinearLayout.LayoutParams(120,60));list.addView(row);}
-        Button add=btn("➕ افزودن");add.setOnClickListener(v->addEntry(key,"مورد جدید",()->manage(key,title)));addView(add);Button back=btn("← بازگشت");back.setOnClickListener(v->goBackPage());addView(back);finishScreen(title);
-    }
-    void addEntry(String key,String title,Runnable after){EditText e=new EditText(this);e.setHint(title);new AlertDialog.Builder(this).setTitle(title).setView(e).setPositiveButton("ذخیره",(d,w)->{String v=e.getText().toString().trim();if(!v.isEmpty())try{JSONArray a=AppData.arr(data,key);for(int i=0;i<a.length();i++)if(a.optString(i).equals(v))return;a.put(v);data.put(key,a);AppData.save(this,data);after.run();}catch(Exception ignored){}}).setNegativeButton("لغو",null).show();}
-
-    void reports(){
-        base("گزارش‌ها و خروجی Excel");EditText buyer=input("خریدار (اختیاری)");EditText company=input("شرکت (اختیاری)");EditText from=input("از تاریخ (اختیاری)");EditText to=input("تا تاریخ (اختیاری)");from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));Button show=btn("نمایش گزارش");addView(show);TextView out=tv("",16);addView(out);
-        show.setOnClickListener(v->{JSONArray r=new JSONArray();long total=0;JSONArray a=AppData.arr(data,"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String d=p.optString("buyDate");if(!buyer.getText().toString().trim().isEmpty()&&!p.optString("buyer").contains(buyer.getText().toString().trim()))continue;if(!company.getText().toString().trim().isEmpty()&&!p.optString("company").contains(company.getText().toString().trim()))continue;if(!from.getText().toString().trim().isEmpty()&&d.compareTo(from.getText().toString().trim())<0)continue;if(!to.getText().toString().trim().isEmpty()&&d.compareTo(to.getText().toString().trim())>0)continue;r.put(p);try{total+=Long.parseLong(AppData.digits(p.optString("amount","0")));}catch(Exception ignored){}}out.setText("تعداد خرید: "+r.length()+"\nمجموع مبلغ خرید: "+AppData.fmt(""+total)+" ریال");show.setTag(r);});
-        Button ex=btn("📊 خروجی Excel گزارش");ex.setOnClickListener(v->{Object tag=show.getTag();if(tag instanceof JSONArray)exportExcel((JSONArray)tag,"report");else Toast.makeText(this,"ابتدا گزارش را نمایش دهید",Toast.LENGTH_SHORT).show();});addView(ex);Button back=btn("← بازگشت");back.setOnClickListener(v->goBackPage());addView(back);finishScreen("گزارش‌ها و خروجی Excel");
-    }
-
-    public static void schedule(Context c,JSONObject p){try{if(!p.optBoolean("alarm",false))return;long due=PersianDate.millis(p.optString("subDue"),p.optString("alarmTime","10:00"))-p.optInt("alarmDays",1)*86400000L;if(due<=System.currentTimeMillis())return;AlarmManager am=(AlarmManager)c.getSystemService(ALARM_SERVICE);Intent in=new Intent(c,AlarmReceiver.class);in.putExtra("id",p.optString("id"));in.putExtra("title","خرید شماره "+p.optString("purchaseNo")+" - "+p.optString("buyer"));PendingIntent pi=PendingIntent.getBroadcast(c,p.optString("id").hashCode(),in,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);if(Build.VERSION.SDK_INT>=31&&am.canScheduleExactAlarms())am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,due,pi);else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,due,pi);}catch(Exception ignored){}}
-    void alarmDialog(EditText sub,JSONObject old){if(sub.getText().toString().trim().isEmpty()){Toast.makeText(this,"ابتدا تاریخ فرعی را وارد کنید",Toast.LENGTH_SHORT).show();return;}LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);EditText days=new EditText(this);days.setHint("چند روز قبل؟");days.setInputType(2);EditText time=new EditText(this);time.setHint("ساعت هشدار مثل 10:00");l.addView(days);l.addView(time);new AlertDialog.Builder(this).setTitle("هشدار این سفارش").setView(l).setPositiveButton("فعال",(d,w)->{try{if(old==null){Toast.makeText(this,"ابتدا خرید را ذخیره کنید و سپس هشدار را تنظیم کنید",Toast.LENGTH_SHORT).show();return;}old.put("alarm",true);old.put("alarmDays",Integer.parseInt(days.getText().toString()));old.put("alarmTime",time.getText().toString());old.put("subDue",sub.getText().toString());saveAlarmOnly(old);}catch(Exception e){Toast.makeText(this,"مقادیر هشدار نامعتبر است",Toast.LENGTH_SHORT).show();}}).setNegativeButton("لغو",null).show();}
-    void saveAlarmOnly(JSONObject p)throws Exception{JSONArray a=AppData.arr(data,"purchases");for(int i=0;i<a.length();i++)if(a.getJSONObject(i).optString("id").equals(p.optString("id")))a.put(i,p);data.put("purchases",a);AppData.save(this,data);if(Build.VERSION.SDK_INT>=31){AlarmManager am=(AlarmManager)getSystemService(ALARM_SERVICE);if(!am.canScheduleExactAlarms())startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM));}schedule(this,p);Toast.makeText(this,"آلارم این سفارش فعال شد",Toast.LENGTH_SHORT).show();}
-
-    void exportExcel(JSONArray a,String name){try{StringBuilder x=new StringBuilder("<?xml version=\"1.0\"?><Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\"><Worksheet ss:Name=\"خریدها\" xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\"><Table>");String[] h={"نام خریدار","نهاده","شماره خرید","وزن","فی","قیمت توافقی","نوع پرداخت","مبلغ خرید","تاریخ خرید","مقدار ذرت","مقدار سویا","نام شرکت","تاریخ اصلی سررسید","تاریخ فرعی سررسید"};x.append("<Row>");for(String s:h)x.append("<Cell><Data ss:Type=\"String\">").append(xml(s)).append("</Data></Cell>");x.append("</Row>");String[] k={"buyer","commodity","purchaseNo","weight","fee","agreed","payment","amount","buyDate","corn","soy","company","mainDue","subDue"};for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);x.append("<Row>");for(String z:k)x.append("<Cell><Data ss:Type=\"String\">").append(xml(p.optString(z,""))).append("</Data></Cell>");x.append("</Row>");}x.append("</Table></Worksheet></Workbook>");File f=new File(getCacheDir(),name+".xls");FileOutputStream o=new FileOutputStream(f);o.write(x.toString().getBytes("UTF-8"));o.close();Intent in=new Intent(Intent.ACTION_SEND);in.setType("application/vnd.ms-excel");Uri u=FileProvider.getUriForFile(this,"com.morghtak.kharidmanager.fileprovider",f);in.putExtra(Intent.EXTRA_STREAM,u);in.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(in,"ارسال / ذخیره فایل Excel"));}catch(Exception e){Toast.makeText(this,"خطا در ساخت Excel",Toast.LENGTH_LONG).show();}}
-    String xml(String s){return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;");}
-
-    void backup(){
-        base("پشتیبان‌گیری و بازیابی");addView(tv("برای امنیت اطلاعات خریدها، هر چند وقت یک‌بار پشتیبان بگیرید.",16));Button save=btn("💾 ساخت فایل پشتیبان");save.setOnClickListener(v->doBackup());addView(save);Button restore=btn("📥 بازیابی از فایل پشتیبان");restore.setOnClickListener(v->{Intent in=new Intent(Intent.ACTION_OPEN_DOCUMENT);in.setType("application/json");in.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(in,91);});addView(restore);Button back=btn("← بازگشت");back.setOnClickListener(v->goBackPage());addView(back);finishScreen("پشتیبان‌گیری و بازیابی");
-    }
-    void doBackup(){try{File f=new File(getCacheDir(),"kharidmanager_backup.json");FileOutputStream o=new FileOutputStream(f);o.write(data.toString(2).getBytes("UTF-8"));o.close();Intent in=new Intent(Intent.ACTION_SEND);in.setType("application/json");in.putExtra(Intent.EXTRA_STREAM,FileProvider.getUriForFile(this,"com.morghtak.kharidmanager.fileprovider",f));in.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(in,"ذخیره فایل پشتیبان"));}catch(Exception e){Toast.makeText(this,"خطا در پشتیبان‌گیری",Toast.LENGTH_LONG).show();}}
-    @Override protected void onActivityResult(int requestCode,int resultCode,Intent intent){super.onActivityResult(requestCode,resultCode,intent);UiManager.handleLogoResult(this,requestCode,resultCode,intent);if(requestCode==91&&resultCode==RESULT_OK&&intent!=null&&intent.getData()!=null){try{InputStream in=getContentResolver().openInputStream(intent.getData());ByteArrayOutputStream b=new ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)b.write(buf,0,n);in.close();data=new JSONObject(new String(b.toByteArray(),"UTF-8"));AppData.save(this,data);Toast.makeText(this,"بازیابی با موفقیت انجام شد",Toast.LENGTH_LONG).show();goHome();}catch(Exception e){Toast.makeText(this,"فایل پشتیبان معتبر نیست",Toast.LENGTH_LONG).show();}}}
+    void manage(String key,String title){base(title);JSONArray a=AppData.arr(data,key);for(int i=0;i<a.length();i++){final int ix=i;LinearLayout r=new LinearLayout(this);TextView t=tv(a.optString(i),16);r.addView(t,new LinearLayout.LayoutParams(0,60,1));Button d=btn("حذف");d.setOnClickListener(v->{a.remove(ix);try{data.put(key,a);AppData.save(this,data);}catch(Exception ignored){}manage(key,title);});r.addView(d,new LinearLayout.LayoutParams(110,60));add(r);}Button ad=btn("➕ افزودن");ad.setOnClickListener(v->addEntry(key,"مورد جدید",()->manage(key,title)));add(ad);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen(title);}
+    void addEntry(String key,String title,Runnable after){EditText e=new EditText(this);new AlertDialog.Builder(this).setTitle(title).setView(e).setPositiveButton("ذخیره",(d,w)->{try{String v=e.getText().toString().trim();if(v.isEmpty())return;JSONArray a=AppData.arr(data,key);for(int i=0;i<a.length();i++)if(v.equals(a.optString(i)))return;a.put(v);data.put(key,a);AppData.save(this,data);after.run();}catch(Exception ignored){}}).setNegativeButton("لغو",null).show();}
+    void reports(){base("گزارش‌ها و خروجی Excel");EditText q=input("جستجوی خریدار، شرکت یا شماره خرید");Button b=btn("🔎 جستجو");add(b);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);b.setOnClickListener(v->{list.removeAllViews();String s=q.getText().toString().trim();TreeSet<String> buyers=new TreeSet<>(),companies=new TreeSet<>();JSONArray a=sortedPurchases();for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);String blob=p.optString("buyer")+" "+p.optString("company")+" "+p.optString("purchaseNo");if(s.isEmpty()||blob.contains(s)){buyers.add(p.optString("buyer"));companies.add(p.optString("company"));}}for(String x:buyers){Button z=btn("👤 "+x);z.setOnClickListener(vv->openPage(()->reportSelection("خریدار: "+x,"buyer",x)));list.addView(z);}for(String x:companies){Button z=btn("🏢 "+x);z.setOnClickListener(vv->openPage(()->reportSelection("شرکت: "+x,"company",x)));list.addView(z);}});add(tv("ابتدا خریدار یا شرکت را انتخاب کنید؛ سپس خریدها را تیک بزنید و خروجی بگیرید.",13));Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("گزارش‌ها و خروجی Excel");}
+    void reportSelection(String title,String filterKey,String filterVal){
+        base(title);EditText q=input("جستجو: شماره خرید / تاریخ / نام");LinearLayout dates=new LinearLayout(this);EditText f=new EditText(this),t=new EditText(this);f.setHint("از تاریخ");t.setHint("تا تاریخ");f.setOnClickListener(v->pickDate(f));t.setOnClickListener(v->pickDate(t));dates.addView(f,new LinearLayout.LayoutParams(0,60,1));dates.addView(t,new LinearLayout.LayoutParams(0,60,1));add(dates);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);ArrayList<CheckBox> checks=new ArrayList<>();ArrayList<JSONObject> objs=new ArrayList<>();JSONArray a=sortedPurchases();for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(!filterVal.equals(p.optString(filterKey)))continue;CheckBox c=new CheckBox(this);c.setText("خرید "+p.optString("purchaseNo")+" | "+p.optString("buyDate")+" | "+AppData.fmt(p.optString("amount")));checks.add(c);objs.add(p);list.addView(c);}Button all=btn("☑ انتخاب همه");all.setOnClickListener(v->{for(CheckBox c:checks)c.setChecked(true);});add(all);Button ex=btn("📊 خروجی Excel موارد انتخاب‌شده");ex.setOnClickListener(v->{JSONArray r=new JSONArray();for(int i=0;i<checks.size();i++)if(checks.get(i).isChecked())r.put(objs.get(i));if(r.length()==0)for(JSONObject p:objs)r.put(p);exportExcel(r,"report_"+safe(filterVal));});add(ex);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen(title);}
+    String safe(String s){return s.replaceAll("[\\\\/:*?\"<>|]","_");}
+    void exportExcel(JSONArray a,String name){try{String[] h={"نام خریدار","نهاده","شماره خرید","وزن","فی","نوع پرداخت","مبلغ خرید","تاریخ خرید","مقدار ذرت","مقدار سویا","نام شرکت","تاریخ اصلی سررسید","وصول شد","تخصیص شد"};String[] k={"buyer","commodity","purchaseNo","weight","fee","payment","amount","buyDate","corn","soy","company","mainDue","collected","allocated"};StringBuilder x=new StringBuilder("\uFEFF");for(String s:h)x.append(s).append("\t");x.append("\n");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);for(String z:k)x.append(xml(p.optString(z,""))).append("\t");x.append("\n");}File f=new File(getCacheDir(),name+".xls");FileOutputStream o=new FileOutputStream(f);o.write(x.toString().getBytes("UTF-8"));o.close();Intent in=new Intent(Intent.ACTION_SEND);in.setType("application/vnd.ms-excel");in.putExtra(Intent.EXTRA_STREAM,FileProvider.getUriForFile(this,"com.morghtak.kharidmanager.fileprovider",f));in.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(in,"ارسال / ذخیره Excel"));}catch(Exception e){Toast.makeText(this,"خطا در ساخت Excel",Toast.LENGTH_LONG).show();}}
+    String xml(String s){return s.replace("&","&amp;").replace("\t"," ").replace("\n"," ").replace("\r"," ");}
+    void backup(){base("پشتیبان‌گیری و بازیابی");add(tv("برای امنیت اطلاعات، نسخه پشتیبان تهیه کنید.",16));Button b=btn("💾 ساخت فایل پشتیبان");b.setOnClickListener(v->doBackup());add(b);b=btn("📥 بازیابی از فایل پشتیبان");b.setOnClickListener(v->{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,91);});add(b);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پشتیبان‌گیری و بازیابی");}
+    void doBackup(){try{File f=new File(getCacheDir(),"kharidmanager_backup.json");FileOutputStream o=new FileOutputStream(f);o.write(data.toString(2).getBytes("UTF-8"));o.close();Intent i=new Intent(Intent.ACTION_SEND);i.setType("application/json");i.putExtra(Intent.EXTRA_STREAM,FileProvider.getUriForFile(this,"com.morghtak.kharidmanager.fileprovider",f));i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"ذخیره فایل پشتیبان"));}catch(Exception e){Toast.makeText(this,"خطا در پشتیبان‌گیری",Toast.LENGTH_LONG).show();}}
+    @Override protected void onActivityResult(int r,int c,Intent i){super.onActivityResult(r,c,i);UiManager.handleLogoResult(this,r,c,i);if(r==91&&c==RESULT_OK&&i!=null&&i.getData()!=null)try{InputStream in=getContentResolver().openInputStream(i.getData());ByteArrayOutputStream o=new ByteArrayOutputStream();byte[] b=new byte[4096];int n;while((n=in.read(b))>0)o.write(b,0,n);in.close();data=new JSONObject(new String(o.toByteArray(),"UTF-8"));AppData.save(this,data);goHome();}catch(Exception e){Toast.makeText(this,"فایل پشتیبان معتبر نیست",Toast.LENGTH_LONG).show();}}
+    public static JSONObject findStatic(Context c,String id){try{JSONArray a=AppData.arr(AppData.root(c),"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p!=null&&id!=null&&id.equals(p.optString("id")))return p;}}catch(Exception ignored){}return null;}
+    public static void schedule(Context c,JSONObject p){try{if(!p.optBoolean("alarm")||p.optBoolean("collected"))return;long at=PersianDate.millis(p.optString("mainDue"),p.optString("alarmTime","10:00"))-p.optInt("alarmDays",1)*86400000L;if(p.optBoolean("alarmRepeat")&&at<=System.currentTimeMillis()){long step=86400000L;while(at<=System.currentTimeMillis())at+=step;}if(at<=System.currentTimeMillis())return;AlarmManager am=(AlarmManager)c.getSystemService(ALARM_SERVICE);Intent in=new Intent(c,AlarmReceiver.class);in.putExtra("id",p.optString("id"));in.putExtra("title","خرید "+p.optString("purchaseNo")+" - "+p.optString("buyer"));PendingIntent pi=PendingIntent.getBroadcast(c,p.optString("id").hashCode(),in,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);if(Build.VERSION.SDK_INT>=31&&am.canScheduleExactAlarms())am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);}catch(Exception ignored){}}
+    public static void scheduleNext(Context c,JSONObject p){try{if(!p.optBoolean("alarmRepeat")||p.optBoolean("collected"))return;AlarmManager am=(AlarmManager)c.getSystemService(ALARM_SERVICE);Calendar cal=Calendar.getInstance();cal.add(Calendar.DAY_OF_YEAR,1);String[] hm=p.optString("alarmTime","10:00").split(":");try{cal.set(Calendar.HOUR_OF_DAY,Integer.parseInt(hm[0]));cal.set(Calendar.MINUTE,Integer.parseInt(hm[1]));}catch(Exception ignored){}cal.set(Calendar.SECOND,0);cal.set(Calendar.MILLISECOND,0);long at=cal.getTimeInMillis();Intent in=new Intent(c,AlarmReceiver.class);in.putExtra("id",p.optString("id"));in.putExtra("title","خرید "+p.optString("purchaseNo")+" - "+p.optString("buyer"));PendingIntent pi=PendingIntent.getBroadcast(c,p.optString("id").hashCode(),in,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);if(Build.VERSION.SDK_INT>=31&&am.canScheduleExactAlarms())am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);}catch(Exception ignored){}}
+    public static void cancelAlarm(Context c,JSONObject p){try{AlarmManager am=(AlarmManager)c.getSystemService(ALARM_SERVICE);Intent in=new Intent(c,AlarmReceiver.class);PendingIntent pi=PendingIntent.getBroadcast(c,p.optString("id").hashCode(),in,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);am.cancel(pi);pi.cancel();}catch(Exception ignored){}}
 }
