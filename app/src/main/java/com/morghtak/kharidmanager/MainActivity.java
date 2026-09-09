@@ -6,6 +6,7 @@ import android.content.*;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.*;
 import android.view.*;
 import android.view.inputmethod.InputMethodManager;
@@ -21,9 +22,7 @@ public class MainActivity extends Activity {
     LinearLayout root;
     JSONObject data;
     ArrayList<EditText> inputs = new ArrayList<>();
-
     Spinner buyerSp, commoditySp, paymentSp, companySp;
-
     final ArrayDeque<Runnable> history = new ArrayDeque<>();
     Runnable currentPage;
 
@@ -162,7 +161,7 @@ public class MainActivity extends Activity {
 
         s.setText(
                 "تعداد خریدها: " + a.length() +
-                        "\nخریدهای در انتظار وصول: " + open
+                "\nخریدهای در انتظار وصول: " + open
         );
 
         Button b = btn("➕ ثبت خرید جدید");
@@ -182,13 +181,11 @@ public class MainActivity extends Activity {
         add(b);
 
         b = btn("🏢 شرکت‌ها");
-        b.setOnClickListener(v ->
-                openPage(() -> manage("companies", "شرکت‌ها")));
+        b.setOnClickListener(v -> openPage(() -> manage("companies", "شرکت‌ها")));
         add(b);
 
         b = btn("🌾 نهاده‌ها");
-        b.setOnClickListener(v ->
-                openPage(() -> manage("commodities", "نهاده‌ها")));
+        b.setOnClickListener(v -> openPage(() -> manage("commodities", "نهاده‌ها")));
         add(b);
 
         b = btn("📊 گزارش‌ها و خروجی Excel");
@@ -222,7 +219,25 @@ public class MainActivity extends Activity {
 
     void finishScreen(String title) {
         UiManager.decorate(this, root, title);
+
         hideKeyboard();
+
+        if (root != null) {
+            for (int i = 0; i < root.getChildCount(); i++) {
+                View v = root.getChildAt(i);
+
+                if (v instanceof Button) {
+                    Button b = (Button) v;
+                    String t = b.getText().toString();
+
+                    if (t.contains("وصول") ||
+                            t.contains("تخصیص") ||
+                            t.contains("هشدار")) {
+                        styleToggle(b);
+                    }
+                }
+            }
+        }
     }
 
     void hideKeyboard() {
@@ -362,24 +377,17 @@ public class MainActivity extends Activity {
         );
     }
 
-    // تقویم شمسی گرافیکی
+    // انتخاب تاریخ با تقویم شمسی گرافیکی
     void pickDate(EditText target) {
-        PersianCalendarDialog dlg =
-                new PersianCalendarDialog(
-                        this,
-                        target
-                );
+        final PersianCalendarDialog dlg =
+                new PersianCalendarDialog(this, target);
 
         dlg.show();
     }
 
     void form(JSONObject old) {
 
-        base(
-                old == null
-                        ? "ثبت خرید جدید"
-                        : "ویرایش خرید"
-        );
+        base(old == null ? "ثبت خرید جدید" : "ویرایش خرید");
 
         inputs.clear();
 
@@ -426,53 +434,50 @@ public class MainActivity extends Activity {
                 EditText e = input(labels[i]);
 
                 if (i == 7 || i == 11) {
-                    e.setFocusable(false);
-                    e.setClickable(true);
-                    e.setOnClickListener(v -> pickDate(e));
+                    e.setOnClickListener(
+                            v -> pickDate(e)
+                    );
                 }
 
-                if (
-                        i == 3 ||
+                if (i == 3 ||
                         i == 4 ||
                         i == 6 ||
                         i == 8 ||
-                        i == 9
-                ) {
+                        i == 9) {
+
                     e.setInputType(2);
                     addGrouping(e);
                 }
             }
         }
 
-        // مبلغ خرید فقط محاسبه خودکار است
         inputs.get(6).setFocusable(false);
         inputs.get(6).setClickable(false);
 
-        TextWatcher calcW =
-                new TextWatcher() {
+        TextWatcher calcW = new TextWatcher() {
 
-                    public void beforeTextChanged(
-                            CharSequence s,
-                            int st,
-                            int c,
-                            int a
-                    ) {
-                    }
+            public void beforeTextChanged(
+                    CharSequence s,
+                    int st,
+                    int c,
+                    int a
+            ) {
+            }
 
-                    public void onTextChanged(
-                            CharSequence s,
-                            int st,
-                            int b,
-                            int c
-                    ) {
-                    }
+            public void onTextChanged(
+                    CharSequence s,
+                    int st,
+                    int b,
+                    int c
+            ) {
+            }
 
-                    public void afterTextChanged(
-                            Editable e
-                    ) {
-                        calcAmount();
-                    }
-                };
+            public void afterTextChanged(
+                    Editable e
+            ) {
+                calcAmount();
+            }
+        };
 
         inputs.get(3).addTextChangedListener(calcW);
         inputs.get(4).addTextChangedListener(calcW);
@@ -480,7 +485,9 @@ public class MainActivity extends Activity {
         if (old != null) {
             fill(old);
         } else {
-            inputs.get(7).setText(PersianDate.today());
+            inputs.get(7).setText(
+                    PersianDate.today()
+            );
         }
 
         add(tv("وضعیت خرید", 16));
@@ -489,7 +496,10 @@ public class MainActivity extends Activity {
                 toggleButton(
                         "وصول",
                         old != null &&
-                                old.optBoolean("collected", false)
+                                old.optBoolean(
+                                        "collected",
+                                        false
+                                )
                 );
 
         add(collected);
@@ -498,7 +508,10 @@ public class MainActivity extends Activity {
                 toggleButton(
                         "تخصیص",
                         old != null &&
-                                old.optBoolean("allocated", false)
+                                old.optBoolean(
+                                        "allocated",
+                                        false
+                                )
                 );
 
         add(allocated);
@@ -509,23 +522,43 @@ public class MainActivity extends Activity {
                 toggleButton(
                         "هشدار",
                         old != null &&
-                                old.optBoolean("alarm", false)
+                                old.optBoolean(
+                                        "alarm",
+                                        false
+                                )
                 );
 
         add(alarm);
 
-        LinearLayout al = new LinearLayout(this);
-        al.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout al =
+                new LinearLayout(this);
+
+        al.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
         add(al);
 
-        EditText days = new EditText(this);
-        days.setHint("چند روز قبل از سررسید؟");
+        EditText days =
+                new EditText(this);
+
+        days.setHint(
+                "چند روز قبل از سررسید؟"
+        );
+
         days.setInputType(2);
+
         al.addView(days);
 
-        EditText time = new EditText(this);
-        time.setHint("ساعت هشدار مثل 10:00");
+        EditText time =
+                new EditText(this);
+
+        time.setHint(
+                "ساعت هشدار مثل 10:00"
+        );
+
         time.setSingleLine(true);
+
         al.addView(time);
 
         Spinner repeat =
@@ -549,7 +582,10 @@ public class MainActivity extends Activity {
         if (old != null) {
 
             days.setText(
-                    "" + old.optInt("alarmDays", 1)
+                    "" + old.optInt(
+                            "alarmDays",
+                            1
+                    )
             );
 
             time.setText(
@@ -563,9 +599,7 @@ public class MainActivity extends Activity {
                     old.optBoolean(
                             "alarmRepeat",
                             false
-                    )
-                            ? 1
-                            : 0
+                    ) ? 1 : 0
             );
 
             updateAlarmPreview(
@@ -594,6 +628,7 @@ public class MainActivity extends Activity {
                             int b,
                             int c
                     ) {
+
                         updateAlarmPreview(
                                 preview,
                                 inputs.get(11)
@@ -635,16 +670,20 @@ public class MainActivity extends Activity {
         });
 
         collected.setOnClickListener(v -> {
+
             collected.setSelected(
                     !collected.isSelected()
             );
+
             styleToggle(collected);
         });
 
         allocated.setOnClickListener(v -> {
+
             allocated.setSelected(
                     !allocated.isSelected()
             );
+
             styleToggle(allocated);
         });
 
@@ -657,6 +696,7 @@ public class MainActivity extends Activity {
             styleToggle(alarm);
 
             if (old != null) {
+
                 try {
                     old.remove("alarm");
                     old.remove("alarmRepeat");
@@ -672,8 +712,8 @@ public class MainActivity extends Activity {
         Button save =
                 btn("✓ ذخیره خرید و هشدار");
 
-        save.setOnClickListener(v ->
-                savePurchase(
+        save.setOnClickListener(
+                v -> savePurchase(
                         old,
                         collected.isSelected(),
                         allocated.isSelected(),
@@ -689,7 +729,9 @@ public class MainActivity extends Activity {
         Button back =
                 btn("← بازگشت");
 
-        back.setOnClickListener(v -> back());
+        back.setOnClickListener(
+                v -> back()
+        );
 
         add(back);
 
@@ -699,7 +741,7 @@ public class MainActivity extends Activity {
                         : "ویرایش خرید"
         );
 
-        // بعد از اعمال ظاهر عمومی، ظاهر کلیدهای وضعیت را دوباره اعمال می‌کنیم
+        // بعد از decorate دوباره ظاهر کلیدها را اعمال می‌کنیم
         styleToggle(collected);
         styleToggle(allocated);
         styleToggle(alarm);
@@ -709,6 +751,7 @@ public class MainActivity extends Activity {
             String label,
             boolean on
     ) {
+
         Button b =
                 btn(
                         on
@@ -717,6 +760,7 @@ public class MainActivity extends Activity {
                 );
 
         b.setSelected(on);
+
         styleToggle(b);
 
         return b;
@@ -743,44 +787,22 @@ public class MainActivity extends Activity {
                         : UiManager.text(this)
         );
 
-        GradientDrawable bg =
-                new GradientDrawable();
-
-        bg.setCornerRadius(
-                UiManager.dp(
-                        this,
-                        18
-                )
-        );
-
-        bg.setColor(
+        b.setBackgroundColor(
                 on
                         ? UiManager.primary(this)
                         : UiManager.secondary(this)
         );
 
-        if (!on) {
-            bg.setStroke(
-                    UiManager.dp(this, 1),
-                    UiManager.primary(this)
-            );
-        }
-
-        b.setBackground(bg);
-
         b.setAllCaps(false);
 
-        b.setGravity(Gravity.CENTER);
-
         b.setTypeface(
-                UiManager.selectedTypeface(
-                        this,
-                        Typeface.BOLD
-                )
+                Typeface.DEFAULT,
+                Typeface.BOLD
         );
     }
 
     String baseToggleText(String s) {
+
         return s
                 .replace(" شد", "")
                 .replace("✓ ", "")
@@ -830,9 +852,11 @@ public class MainActivity extends Activity {
     ) {
 
         if (!on) {
+
             v.setText(
                     "هشدار تنظیم نشده است"
             );
+
             return;
         }
 
@@ -862,12 +886,11 @@ public class MainActivity extends Activity {
 
         for (int i = 0; i < keys.length; i++) {
 
-            if (
-                    i != 0 &&
+            if (i != 0 &&
                     i != 1 &&
                     i != 5 &&
-                    i != 10
-            ) {
+                    i != 10) {
+
                 inputs.get(i).setText(
                         p.optString(
                                 keys[i],
@@ -922,34 +945,39 @@ public class MainActivity extends Activity {
                                 .getText()
                                 .toString();
 
-                if (i == 0)
+                if (i == 0) {
                     v = String.valueOf(
                             buyerSp.getSelectedItem()
                     );
+                }
 
-                if (i == 1)
+                if (i == 1) {
                     v = String.valueOf(
                             commoditySp.getSelectedItem()
                     );
+                }
 
-                if (i == 5)
+                if (i == 5) {
                     v = String.valueOf(
                             paymentSp.getSelectedItem()
                     );
+                }
 
-                if (i == 10)
+                if (i == 10) {
                     v = String.valueOf(
                             companySp.getSelectedItem()
                     );
+                }
 
-                r.put(keys[i], v);
+                r.put(
+                        keys[i],
+                        v
+                );
             }
 
-            if (
-                    r.optString("buyer")
-                            .trim()
-                            .isEmpty()
-            ) {
+            if (r.optString("buyer")
+                    .trim()
+                    .isEmpty()) {
 
                 Toast.makeText(
                         this,
@@ -960,11 +988,9 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            if (
-                    r.optString("purchaseNo")
-                            .trim()
-                            .isEmpty()
-            ) {
+            if (r.optString("purchaseNo")
+                    .trim()
+                    .isEmpty()) {
 
                 Toast.makeText(
                         this,
@@ -982,9 +1008,20 @@ public class MainActivity extends Activity {
                             : old.optString("id")
             );
 
-            r.put("collected", collected);
-            r.put("allocated", allocated);
-            r.put("alarm", alarm);
+            r.put(
+                    "collected",
+                    collected
+            );
+
+            r.put(
+                    "allocated",
+                    allocated
+            );
+
+            r.put(
+                    "alarm",
+                    alarm
+            );
 
             r.put(
                     "alarmDays",
@@ -1013,13 +1050,11 @@ public class MainActivity extends Activity {
 
             for (int i = 0; i < a.length(); i++) {
 
-                if (
-                        a.optJSONObject(i)
-                                .optString("id")
-                                .equals(
-                                        r.optString("id")
-                                )
-                ) {
+                if (a.optJSONObject(i)
+                        .optString("id")
+                        .equals(
+                                r.optString("id")
+                        )) {
 
                     a.put(i, r);
                     replaced = true;
@@ -1027,10 +1062,14 @@ public class MainActivity extends Activity {
                 }
             }
 
-            if (!replaced)
+            if (!replaced) {
                 a.put(r);
+            }
 
-            data.put("purchases", a);
+            data.put(
+                    "purchases",
+                    a
+            );
 
             addUnique(
                     "buyers",
@@ -1042,12 +1081,16 @@ public class MainActivity extends Activity {
                     r.optString("company")
             );
 
-            AppData.save(this, data);
+            AppData.save(
+                    this,
+                    data
+            );
 
-            if (alarm)
+            if (alarm) {
                 schedule(this, r);
-            else
+            } else {
                 cancelAlarm(this, r);
+            }
 
             Toast.makeText(
                     this,
@@ -1083,22 +1126,23 @@ public class MainActivity extends Activity {
             String val
     ) throws Exception {
 
-        if (
-                val == null ||
-                val.trim().isEmpty()
-        )
+        if (val == null ||
+                val.trim().isEmpty()) {
             return;
+        }
 
         JSONArray a =
-                AppData.arr(data, key);
+                AppData.arr(
+                        data,
+                        key
+                );
 
         for (int i = 0; i < a.length(); i++) {
 
-            if (
-                    a.optString(i)
-                            .equals(val)
-            )
+            if (a.optString(i)
+                    .equals(val)) {
                 return;
+            }
         }
 
         a.put(val);
@@ -1130,9 +1174,6 @@ public class MainActivity extends Activity {
 
         from.setHint("از تاریخ");
         to.setHint("تا تاریخ");
-
-        from.setFocusable(false);
-        to.setFocusable(false);
 
         from.setOnClickListener(
                 v -> pickDate(from)
@@ -1189,26 +1230,26 @@ public class MainActivity extends Activity {
                             .trim();
 
             String f =
-                    from.getText().toString();
+                    from.getText()
+                            .toString();
 
             String t =
-                    to.getText().toString();
+                    to.getText()
+                            .toString();
 
             for (int i = 0; i < a.length(); i++) {
 
                 JSONObject p =
                         a.optJSONObject(i);
 
-                if (p == null)
-                    continue;
+                if (p == null) continue;
 
-                if (
-                        fixedBuyer != null &&
+                if (fixedBuyer != null &&
                         !fixedBuyer.equals(
                                 p.optString("buyer")
-                        )
-                )
+                        )) {
                     continue;
+                }
 
                 String blob =
                         p.optString("buyer") +
@@ -1219,25 +1260,22 @@ public class MainActivity extends Activity {
                                 " " +
                                 p.optString("commodity");
 
-                if (
-                        !s.isEmpty() &&
-                        !blob.contains(s)
-                )
+                if (!s.isEmpty() &&
+                        !blob.contains(s)) {
                     continue;
+                }
 
-                if (
-                        !f.isEmpty() &&
+                if (!f.isEmpty() &&
                         p.optString("buyDate")
-                                .compareTo(f) < 0
-                )
+                                .compareTo(f) < 0) {
                     continue;
+                }
 
-                if (
-                        !t.isEmpty() &&
+                if (!t.isEmpty() &&
                         p.optString("buyDate")
-                                .compareTo(t) > 0
-                )
+                                .compareTo(t) > 0) {
                     continue;
+                }
 
                 Button b =
                         btn(
@@ -1291,7 +1329,9 @@ public class MainActivity extends Activity {
                 new ArrayList<>();
 
         for (int i = 0; i < src.length(); i++) {
-            l.add(src.optJSONObject(i));
+            l.add(
+                    src.optJSONObject(i)
+            );
         }
 
         Collections.sort(
@@ -1306,8 +1346,9 @@ public class MainActivity extends Activity {
         JSONArray r =
                 new JSONArray();
 
-        for (JSONObject p : l)
+        for (JSONObject p : l) {
             r.put(p);
+        }
 
         return r;
     }
@@ -1404,7 +1445,9 @@ public class MainActivity extends Activity {
 
                 p.put(
                         "collected",
-                        !p.optBoolean("collected")
+                        !p.optBoolean(
+                                "collected"
+                        )
                 );
 
                 AppData.save(
@@ -1412,8 +1455,9 @@ public class MainActivity extends Activity {
                         data
                 );
 
-                if (p.optBoolean("collected"))
+                if (p.optBoolean("collected")) {
                     cancelAlarm(this, p);
+                }
 
                 details(p);
 
@@ -1436,7 +1480,9 @@ public class MainActivity extends Activity {
 
                 p.put(
                         "allocated",
-                        !p.optBoolean("allocated")
+                        !p.optBoolean(
+                                "allocated"
+                        )
                 );
 
                 AppData.save(
@@ -1459,17 +1505,17 @@ public class MainActivity extends Activity {
 
             try {
 
-                p.put("alarm", false);
+                p.put(
+                        "alarm",
+                        false
+                );
 
                 AppData.save(
                         this,
                         data
                 );
 
-                cancelAlarm(
-                        this,
-                        p
-                );
+                cancelAlarm(this, p);
 
                 details(p);
 
@@ -1480,17 +1526,18 @@ public class MainActivity extends Activity {
         add(rem);
 
         Button ex =
-                btn("📊 خروجی Excel همین خرید");
+                btn(
+                        "📊 خروجی Excel همین خرید"
+                );
 
         ex.setOnClickListener(
-                v ->
-                        exportExcel(
-                                new JSONArray().put(p),
-                                "purchase_" +
-                                        p.optString(
-                                                "purchaseNo"
-                                        )
-                        )
+                v -> exportExcel(
+                        new JSONArray().put(p),
+                        "purchase_" +
+                                p.optString(
+                                        "purchaseNo"
+                                )
+                )
         );
 
         add(ex);
@@ -1513,15 +1560,11 @@ public class MainActivity extends Activity {
                 );
 
         same.setOnClickListener(
-                v ->
-                        openPage(
-                                () ->
-                                        listPurchases(
-                                                p.optString(
-                                                        "buyer"
-                                                )
-                                        )
+                v -> openPage(
+                        () -> listPurchases(
+                                p.optString("buyer")
                         )
+                )
         );
 
         add(same);
@@ -1562,13 +1605,13 @@ public class MainActivity extends Activity {
             JSONObject p =
                     a.optJSONObject(i);
 
-            if (
-                    p != null &&
+            if (p != null &&
                     id.equals(
                             p.optString("id")
-                    )
-            )
+                    )) {
+
                 return p;
+            }
         }
 
         return null;
@@ -1607,13 +1650,12 @@ public class MainActivity extends Activity {
 
             for (int i = 0; i < a.length(); i++) {
 
-                if (
-                        !a.getJSONObject(i)
-                                .optString("id")
-                                .equals(
-                                        p.optString("id")
-                                )
-                ) {
+                if (!a.getJSONObject(i)
+                        .optString("id")
+                        .equals(
+                                p.optString("id")
+                        )) {
+
                     b.put(
                             a.getJSONObject(i)
                     );
@@ -1643,7 +1685,9 @@ public class MainActivity extends Activity {
         );
 
         EditText q =
-                input("جستجوی نام خریدار");
+                input(
+                        "جستجوی نام خریدار"
+                );
 
         Button go =
                 btn("🔎 جستجو");
@@ -1679,21 +1723,18 @@ public class MainActivity extends Activity {
                 String name =
                         b.optString(i);
 
-                if (
-                        !s.isEmpty() &&
-                        !name.contains(s)
-                )
+                if (!s.isEmpty() &&
+                        !name.contains(s)) {
                     continue;
+                }
 
                 Button x =
                         btn("👤 " + name);
 
                 x.setOnClickListener(
-                        v ->
-                                openPage(
-                                        () ->
-                                                buyerFile(name)
-                                )
+                        v -> openPage(
+                                () -> buyerFile(name)
+                        )
                 );
 
                 list.addView(x);
@@ -1710,12 +1751,11 @@ public class MainActivity extends Activity {
                 btn("➕ افزودن خریدار");
 
         addb.setOnClickListener(
-                v ->
-                        addEntry(
-                                "buyers",
-                                "خریدار جدید",
-                                this::buyersPage
-                        )
+                v -> addEntry(
+                        "buyers",
+                        "خریدار جدید",
+                        this::buyersPage
+                )
         );
 
         add(addb);
@@ -1735,7 +1775,8 @@ public class MainActivity extends Activity {
     void buyerFile(String buyer) {
 
         base(
-                "پرونده خریدار: " + buyer
+                "پرونده خریدار: " +
+                        buyer
         );
 
         JSONArray a =
@@ -1762,13 +1803,12 @@ public class MainActivity extends Activity {
             JSONObject p =
                     a.optJSONObject(i);
 
-            if (
-                    p == null ||
+            if (p == null ||
                     !buyer.equals(
                             p.optString("buyer")
-                    )
-            )
+                    )) {
                 continue;
+            }
 
             n++;
 
@@ -1779,17 +1819,16 @@ public class MainActivity extends Activity {
 
             total += amt;
 
-            if (
-                    p.optBoolean("collected")
-            ) {
+            if (p.optBoolean("collected")) {
 
                 coll++;
                 colAmt += amt;
 
             } else {
 
-                if (noColl.length() > 0)
+                if (noColl.length() > 0) {
                     noColl.append("، ");
+                }
 
                 noColl.append(
                         p.optString(
@@ -1798,16 +1837,15 @@ public class MainActivity extends Activity {
                 );
             }
 
-            if (
-                    p.optBoolean("allocated")
-            ) {
+            if (p.optBoolean("allocated")) {
 
                 alloc++;
 
             } else {
 
-                if (noAlloc.length() > 0)
+                if (noAlloc.length() > 0) {
                     noAlloc.append("، ");
+                }
 
                 noAlloc.append(
                         p.optString(
@@ -1864,13 +1902,9 @@ public class MainActivity extends Activity {
                 );
 
         all.setOnClickListener(
-                v ->
-                        openPage(
-                                () ->
-                                        listPurchases(
-                                                buyer
-                                        )
-                        )
+                v -> openPage(
+                        () -> listPurchases(buyer)
+                )
         );
 
         add(all);
@@ -1893,15 +1927,14 @@ public class MainActivity extends Activity {
 
         add(back);
 
-        finishScreen(
-                "پرونده خریدار"
-        );
+        finishScreen("پرونده خریدار");
     }
 
     void buyerStats(String buyer) {
 
         base(
-                "آمار بازه‌ای: " + buyer
+                "آمار بازه‌ای: " +
+                        buyer
         );
 
         EditText f =
@@ -1909,9 +1942,6 @@ public class MainActivity extends Activity {
 
         EditText t =
                 input("تا تاریخ");
-
-        f.setFocusable(false);
-        t.setFocusable(false);
 
         f.setOnClickListener(
                 v -> pickDate(f)
@@ -1935,7 +1965,7 @@ public class MainActivity extends Activity {
 
             int n = 0;
             int c = 0;
-            int aCount = 0;
+            int a = 0;
 
             long total = 0;
 
@@ -1950,61 +1980,68 @@ public class MainActivity extends Activity {
                 JSONObject x =
                         p.optJSONObject(i);
 
-                if (
-                        x == null ||
+                if (x == null ||
                         !buyer.equals(
                                 x.optString("buyer")
-                        )
-                )
+                        )) {
                     continue;
+                }
 
                 String d =
-                        x.optString("buyDate");
+                        x.optString(
+                                "buyDate"
+                        );
 
-                if (
-                        !f.getText().toString().isEmpty() &&
+                if (!f.getText()
+                        .toString()
+                        .isEmpty() &&
                         d.compareTo(
-                                f.getText().toString()
-                        ) < 0
-                )
+                                f.getText()
+                                        .toString()
+                        ) < 0) {
                     continue;
+                }
 
-                if (
-                        !t.getText().toString().isEmpty() &&
+                if (!t.getText()
+                        .toString()
+                        .isEmpty() &&
                         d.compareTo(
-                                t.getText().toString()
-                        ) > 0
-                )
+                                t.getText()
+                                        .toString()
+                        ) > 0) {
                     continue;
+                }
 
                 n++;
 
                 total +=
                         toLong(
-                                x.optString("amount")
+                                x.optString(
+                                        "amount"
+                                )
                         );
 
-                if (
-                        x.optBoolean("collected")
-                )
+                if (x.optBoolean("collected")) {
                     c++;
+                }
 
-                if (
-                        x.optBoolean("allocated")
-                )
-                    aCount++;
+                if (x.optBoolean("allocated")) {
+                    a++;
+                }
             }
 
             out.setText(
-                    "تعداد خرید: " + n +
+                    "تعداد خرید: " +
+                            n +
                             "\nمجموع مبلغ: " +
                             AppData.fmt(
                                     "" + total
                             ) +
                             " ریال\n" +
-                            "وصول‌شده: " + c +
+                            "وصول‌شده: " +
+                            c +
                             "\nتخصیص‌شده: " +
-                            aCount
+                            a
             );
         });
 
@@ -2023,10 +2060,13 @@ public class MainActivity extends Activity {
     long toLong(String s) {
 
         try {
+
             return Long.parseLong(
                     AppData.digits(s)
             );
+
         } catch (Exception e) {
+
             return 0;
         }
     }
@@ -2035,12 +2075,7 @@ public class MainActivity extends Activity {
 
         base("سررسیدها");
 
-        add(
-                tv(
-                        "حالت نمایش",
-                        16
-                )
-        );
+        add(tv("حالت نمایش", 16));
 
         Spinner mode =
                 spinner(
@@ -2063,9 +2098,6 @@ public class MainActivity extends Activity {
 
         f.setHint("از تاریخ");
         t.setHint("تا تاریخ");
-
-        f.setFocusable(false);
-        t.setFocusable(false);
 
         f.setOnClickListener(
                 v -> pickDate(f)
@@ -2127,36 +2159,36 @@ public class MainActivity extends Activity {
                 JSONObject p =
                         a.optJSONObject(i);
 
-                if (
-                        p == null ||
+                if (p == null ||
                         p.optBoolean("collected") ||
                         p.optString("mainDue")
-                                .isEmpty()
-                )
+                                .isEmpty()) {
                     continue;
+                }
 
-                if (
-                        mode.getSelectedItemPosition()
-                                == 1
-                ) {
+                if (mode.getSelectedItemPosition() == 1) {
 
-                    if (
-                            !f.getText().toString().isEmpty() &&
+                    if (!f.getText()
+                            .toString()
+                            .isEmpty() &&
                             p.optString("mainDue")
                                     .compareTo(
-                                            f.getText().toString()
-                                    ) < 0
-                    )
+                                            f.getText()
+                                                    .toString()
+                                    ) < 0) {
                         continue;
+                    }
 
-                    if (
-                            !t.getText().toString().isEmpty() &&
+                    if (!t.getText()
+                            .toString()
+                            .isEmpty() &&
                             p.optString("mainDue")
                                     .compareTo(
-                                            t.getText().toString()
-                                    ) > 0
-                    )
+                                            t.getText()
+                                                    .toString()
+                                    ) > 0) {
                         continue;
+                    }
                 }
 
                 l.add(p);
@@ -2189,11 +2221,9 @@ public class MainActivity extends Activity {
                         );
 
                 b.setOnClickListener(
-                        v ->
-                                openPage(
-                                        () ->
-                                                details(p)
-                                )
+                        v -> openPage(
+                                () -> details(p)
+                        )
                 );
 
                 list.addView(b);
@@ -2223,16 +2253,17 @@ public class MainActivity extends Activity {
         String d =
                 p == null
                         ? ""
-                        : p.optString("mainDue");
+                        : p.optString(
+                                "mainDue"
+                        );
 
-        if (
-                d.isEmpty() ||
+        if (d.isEmpty() ||
                 p.optBoolean(
                         "collected",
                         false
-                )
-        )
+                )) {
             return false;
+        }
 
         long m =
                 PersianDate.millis(
@@ -2240,10 +2271,14 @@ public class MainActivity extends Activity {
                         "23:59"
                 );
 
-        return
-                m >= System.currentTimeMillis() &&
-                        m - System.currentTimeMillis()
-                                < 7L * 86400000L;
+        return m >=
+                System.currentTimeMillis()
+                &&
+                m -
+                        System.currentTimeMillis()
+                        <
+                        7L *
+                                86400000L;
     }
 
     void manage(
@@ -2324,16 +2359,14 @@ public class MainActivity extends Activity {
                 btn("➕ افزودن");
 
         ad.setOnClickListener(
-                v ->
-                        addEntry(
+                v -> addEntry(
+                        key,
+                        "مورد جدید",
+                        () -> manage(
                                 key,
-                                "مورد جدید",
-                                () ->
-                                        manage(
-                                                key,
-                                                title
-                                        )
+                                title
                         )
+                )
         );
 
         add(ad);
@@ -2373,8 +2406,9 @@ public class MainActivity extends Activity {
                                                 .toString()
                                                 .trim();
 
-                                if (v.isEmpty())
+                                if (v.isEmpty()) {
                                     return;
+                                }
 
                                 JSONArray a =
                                         AppData.arr(
@@ -2382,14 +2416,15 @@ public class MainActivity extends Activity {
                                                 key
                                         );
 
-                                for (int i = 0; i < a.length(); i++) {
+                                for (int i = 0;
+                                     i < a.length();
+                                     i++) {
 
-                                    if (
-                                            v.equals(
-                                                    a.optString(i)
-                                            )
-                                    )
+                                    if (v.equals(
+                                            a.optString(i)
+                                    )) {
                                         return;
+                                    }
                                 }
 
                                 a.put(v);
@@ -2472,10 +2507,8 @@ public class MainActivity extends Activity {
                                 " " +
                                 p.optString("purchaseNo");
 
-                if (
-                        s.isEmpty() ||
-                        blob.contains(s)
-                ) {
+                if (s.isEmpty() ||
+                        blob.contains(s)) {
 
                     buyers.add(
                             p.optString("buyer")
@@ -2493,15 +2526,13 @@ public class MainActivity extends Activity {
                         btn("👤 " + x);
 
                 z.setOnClickListener(
-                        vv ->
-                                openPage(
-                                        () ->
-                                                reportSelection(
-                                                        "خریدار: " + x,
-                                                        "buyer",
-                                                        x
-                                                )
+                        vv -> openPage(
+                                () -> reportSelection(
+                                        "خریدار: " + x,
+                                        "buyer",
+                                        x
                                 )
+                        )
                 );
 
                 list.addView(z);
@@ -2513,15 +2544,13 @@ public class MainActivity extends Activity {
                         btn("🏢 " + x);
 
                 z.setOnClickListener(
-                        vv ->
-                                openPage(
-                                        () ->
-                                                reportSelection(
-                                                        "شرکت: " + x,
-                                                        "company",
-                                                        x
-                                                )
+                        vv -> openPage(
+                                () -> reportSelection(
+                                        "شرکت: " + x,
+                                        "company",
+                                        x
                                 )
+                        )
                 );
 
                 list.addView(z);
@@ -2580,9 +2609,6 @@ public class MainActivity extends Activity {
         f.setHint("از تاریخ");
         t.setHint("تا تاریخ");
 
-        f.setFocusable(false);
-        t.setFocusable(false);
-
         f.setOnClickListener(
                 v -> pickDate(f)
         );
@@ -2634,12 +2660,11 @@ public class MainActivity extends Activity {
             JSONObject p =
                     a.optJSONObject(i);
 
-            if (
-                    !filterVal.equals(
-                            p.optString(filterKey)
-                    )
-            )
+            if (!filterVal.equals(
+                    p.optString(filterKey)
+            )) {
                 continue;
+            }
 
             CheckBox c =
                     new CheckBox(this);
@@ -2671,7 +2696,9 @@ public class MainActivity extends Activity {
                             .toString()
                             .trim();
 
-            for (int i = 0; i < checks.size(); i++) {
+            for (int i = 0;
+                 i < checks.size();
+                 i++) {
 
                 JSONObject p =
                         objs.get(i);
@@ -2689,23 +2716,29 @@ public class MainActivity extends Activity {
                         s.isEmpty() ||
                                 blob.contains(s);
 
-                if (
-                        !f.getText().toString().isEmpty() &&
+                if (!f.getText()
+                        .toString()
+                        .isEmpty() &&
                         p.optString("buyDate")
                                 .compareTo(
-                                        f.getText().toString()
-                                ) < 0
-                )
-                    ok = false;
+                                        f.getText()
+                                                .toString()
+                                ) < 0) {
 
-                if (
-                        !t.getText().toString().isEmpty() &&
+                    ok = false;
+                }
+
+                if (!t.getText()
+                        .toString()
+                        .isEmpty() &&
                         p.optString("buyDate")
                                 .compareTo(
-                                        t.getText().toString()
-                                ) > 0
-                )
+                                        t.getText()
+                                                .toString()
+                                ) > 0) {
+
                     ok = false;
+                }
 
                 checks.get(i).setVisibility(
                         ok
@@ -2726,11 +2759,11 @@ public class MainActivity extends Activity {
 
             for (CheckBox c : checks) {
 
-                if (
-                        c.getVisibility()
-                                == View.VISIBLE
-                )
+                if (c.getVisibility() ==
+                        View.VISIBLE) {
+
                     c.setChecked(true);
+                }
             }
         });
 
@@ -2746,29 +2779,34 @@ public class MainActivity extends Activity {
             JSONArray r =
                     new JSONArray();
 
-            for (int i = 0; i < checks.size(); i++) {
+            for (int i = 0;
+                 i < checks.size();
+                 i++) {
 
-                if (
-                        checks.get(i).isChecked() &&
-                        checks.get(i).getVisibility()
-                                == View.VISIBLE
-                )
+                if (checks.get(i).isChecked() &&
+                        checks.get(i).getVisibility() ==
+                                View.VISIBLE) {
+
                     r.put(
                             objs.get(i)
                     );
+                }
             }
 
             if (r.length() == 0) {
 
-                for (int i = 0; i < checks.size(); i++) {
+                for (int i = 0;
+                     i < checks.size();
+                     i++) {
 
-                    if (
-                            checks.get(i).getVisibility()
-                                    == View.VISIBLE
-                    )
+                    if (checks.get(i)
+                            .getVisibility() ==
+                            View.VISIBLE) {
+
                         r.put(
                                 objs.get(i)
                         );
+                    }
                 }
             }
 
@@ -2845,12 +2883,16 @@ public class MainActivity extends Activity {
             StringBuilder x =
                     new StringBuilder("\uFEFF");
 
-            for (String s : h)
-                x.append(s).append("\t");
+            for (String s : h) {
+                x.append(s)
+                        .append("\t");
+            }
 
             x.append("\n");
 
-            for (int i = 0; i < a.length(); i++) {
+            for (int i = 0;
+                 i < a.length();
+                 i++) {
 
                 JSONObject p =
                         a.optJSONObject(i);
@@ -2948,7 +2990,9 @@ public class MainActivity extends Activity {
         );
 
         Button b =
-                btn("💾 ساخت فایل پشتیبان");
+                btn(
+                        "💾 ساخت فایل پشتیبان"
+                );
 
         b.setOnClickListener(
                 v -> doBackup()
@@ -3064,7 +3108,11 @@ public class MainActivity extends Activity {
             Intent i
     ) {
 
-        super.onActivityResult(r, c, i);
+        super.onActivityResult(
+                r,
+                c,
+                i
+        );
 
         UiManager.handleLogoResult(
                 this,
@@ -3073,12 +3121,10 @@ public class MainActivity extends Activity {
                 i
         );
 
-        if (
-                r == 91 &&
+        if (r == 91 &&
                 c == RESULT_OK &&
                 i != null &&
-                i.getData() != null
-        ) {
+                i.getData() != null) {
 
             try {
 
@@ -3096,10 +3142,9 @@ public class MainActivity extends Activity {
 
                 int n;
 
-                while (
-                        (n = in.read(b)) > 0
-                )
+                while ((n = in.read(b)) > 0) {
                     o.write(b, 0, n);
+                }
 
                 in.close();
 
@@ -3142,19 +3187,21 @@ public class MainActivity extends Activity {
                             "purchases"
                     );
 
-            for (int i = 0; i < a.length(); i++) {
+            for (int i = 0;
+                 i < a.length();
+                 i++) {
 
                 JSONObject p =
                         a.optJSONObject(i);
 
-                if (
-                        p != null &&
+                if (p != null &&
                         id != null &&
                         id.equals(
                                 p.optString("id")
-                        )
-                )
+                        )) {
+
                     return p;
+                }
             }
 
         } catch (Exception ignored) {
@@ -3170,11 +3217,10 @@ public class MainActivity extends Activity {
 
         try {
 
-            if (
-                    !p.optBoolean("alarm") ||
-                    p.optBoolean("collected")
-            )
+            if (!p.optBoolean("alarm") ||
+                    p.optBoolean("collected")) {
                 return;
+            }
 
             long at =
                     PersianDate.millis(
@@ -3183,31 +3229,28 @@ public class MainActivity extends Activity {
                                     "alarmTime",
                                     "10:00"
                             )
-                    )
-                            -
+                    ) -
                             p.optInt(
                                     "alarmDays",
                                     1
                             ) *
                                     86400000L;
 
-            if (
-                    p.optBoolean("alarmRepeat") &&
-                    at <= System.currentTimeMillis()
-            ) {
+            if (p.optBoolean("alarmRepeat") &&
+                    at <=
+                            System.currentTimeMillis()) {
 
-                while (
-                        at <=
-                                System.currentTimeMillis()
-                )
+                while (at <=
+                        System.currentTimeMillis()) {
+
                     at += 86400000L;
+                }
             }
 
-            if (
-                    at <=
-                            System.currentTimeMillis()
-            )
+            if (at <=
+                    System.currentTimeMillis()) {
                 return;
+            }
 
             AlarmManager am =
                     (AlarmManager)
@@ -3229,9 +3272,13 @@ public class MainActivity extends Activity {
             in.putExtra(
                     "title",
                     "خرید " +
-                            p.optString("purchaseNo") +
+                            p.optString(
+                                    "purchaseNo"
+                            ) +
                             " - " +
-                            p.optString("buyer")
+                            p.optString(
+                                    "buyer"
+                            )
             );
 
             PendingIntent pi =
@@ -3244,10 +3291,8 @@ public class MainActivity extends Activity {
                                     PendingIntent.FLAG_IMMUTABLE
                     );
 
-            if (
-                    Build.VERSION.SDK_INT >= 31 &&
-                    am.canScheduleExactAlarms()
-            ) {
+            if (Build.VERSION.SDK_INT >= 31 &&
+                    am.canScheduleExactAlarms()) {
 
                 am.setExactAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
@@ -3275,11 +3320,10 @@ public class MainActivity extends Activity {
 
         try {
 
-            if (
-                    !p.optBoolean("alarmRepeat") ||
-                    p.optBoolean("collected")
-            )
+            if (!p.optBoolean("alarmRepeat") ||
+                    p.optBoolean("collected")) {
                 return;
+            }
 
             AlarmManager am =
                     (AlarmManager)
@@ -3343,9 +3387,13 @@ public class MainActivity extends Activity {
             in.putExtra(
                     "title",
                     "خرید " +
-                            p.optString("purchaseNo") +
+                            p.optString(
+                                    "purchaseNo"
+                            ) +
                             " - " +
-                            p.optString("buyer")
+                            p.optString(
+                                    "buyer"
+                            )
             );
 
             PendingIntent pi =
@@ -3358,10 +3406,8 @@ public class MainActivity extends Activity {
                                     PendingIntent.FLAG_IMMUTABLE
                     );
 
-            if (
-                    Build.VERSION.SDK_INT >= 31 &&
-                    am.canScheduleExactAlarms()
-            ) {
+            if (Build.VERSION.SDK_INT >= 31 &&
+                    am.canScheduleExactAlarms()) {
 
                 am.setExactAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
@@ -3442,16 +3488,17 @@ public class MainActivity extends Activity {
             String current =
                     t == null
                             ? ""
-                            : t.getText().toString();
+                            : t.getText()
+                                    .toString();
 
             int[] d =
                     parseJ(current);
 
-            if (d == null)
-                d =
-                        parseJ(
-                                PersianDate.today()
-                        );
+            if (d == null) {
+                d = parseJ(
+                        PersianDate.today()
+                );
+            }
 
             jy = d[0];
             jm = d[1];
@@ -3469,19 +3516,13 @@ public class MainActivity extends Activity {
 
                     return new int[]{
                             Integer.parseInt(
-                                    AppData.digits(
-                                            a[0]
-                                    )
+                                    AppData.digits(a[0])
                             ),
                             Integer.parseInt(
-                                    AppData.digits(
-                                            a[1]
-                                    )
+                                    AppData.digits(a[1])
                             ),
                             Integer.parseInt(
-                                    AppData.digits(
-                                            a[2]
-                                    )
+                                    AppData.digits(a[2])
                             )
                     };
                 }
@@ -3531,37 +3572,6 @@ public class MainActivity extends Activity {
                             60
                     )
             );
-
-            LinearLayout yearNav =
-                    new LinearLayout(
-                            MainActivity.this
-                    );
-
-            Button prevYear =
-                    btn("‹ سال قبل");
-
-            Button nextYear =
-                    btn("سال بعد ›");
-
-            yearNav.addView(
-                    prevYear,
-                    new LinearLayout.LayoutParams(
-                            0,
-                            52,
-                            1
-                    )
-            );
-
-            yearNav.addView(
-                    nextYear,
-                    new LinearLayout.LayoutParams(
-                            0,
-                            52,
-                            1
-                    )
-            );
-
-            box.addView(yearNav);
 
             LinearLayout nav =
                     new LinearLayout(
@@ -3636,38 +3646,6 @@ public class MainActivity extends Activity {
 
             box.addView(bottom);
 
-            prevYear.setOnClickListener(v -> {
-
-                jy--;
-
-                jd =
-                        Math.min(
-                                jd,
-                                monthDays(
-                                        jy,
-                                        jm
-                                )
-                        );
-
-                render();
-            });
-
-            nextYear.setOnClickListener(v -> {
-
-                jy++;
-
-                jd =
-                        Math.min(
-                                jd,
-                                monthDays(
-                                        jy,
-                                        jm
-                                )
-                        );
-
-                render();
-            });
-
             prev.setOnClickListener(v -> {
 
                 jm--;
@@ -3680,10 +3658,7 @@ public class MainActivity extends Activity {
                 jd =
                         Math.min(
                                 jd,
-                                monthDays(
-                                        jy,
-                                        jm
-                                )
+                                monthDays(jy, jm)
                         );
 
                 render();
@@ -3701,10 +3676,7 @@ public class MainActivity extends Activity {
                 jd =
                         Math.min(
                                 jd,
-                                monthDays(
-                                        jy,
-                                        jm
-                                )
+                                monthDays(jy, jm)
                         );
 
                 render();
@@ -3737,11 +3709,9 @@ public class MainActivity extends Activity {
             Window w =
                     getWindow();
 
-            if (w != null)
-                w.setLayout(
-                        -1,
-                        -2
-                );
+            if (w != null) {
+                w.setLayout(-1, -2);
+            }
 
             render();
         }
@@ -3751,21 +3721,26 @@ public class MainActivity extends Activity {
                 int m
         ) {
 
-            return
-                    m <= 6
-                            ? 31
-                            : (
+            return m <= 6
+                    ? 31
+                    : (
                             m <= 11
                                     ? 30
                                     : (
-                                    isLeap(y)
-                                            ? 30
-                                            : 29
-                            )
+                                            isLeap(y)
+                                                    ? 30
+                                                    : 29
+                                    )
                     );
         }
 
         boolean isLeap(int y) {
+
+            PersianDate.toGregorian(
+                    y + 1,
+                    1,
+                    1
+            );
 
             long a =
                     PersianDate.millis(
@@ -3791,9 +3766,8 @@ public class MainActivity extends Activity {
                             "00:00"
                     );
 
-            return
-                    z - a >
-                            365L * 86400000L;
+            return z - a >
+                    365L * 86400000L;
         }
 
         void render() {
@@ -3859,7 +3833,6 @@ public class MainActivity extends Activity {
                     g[2]
             );
 
-            // شنبه = ستون اول
             int first =
                     (c.get(Calendar.DAY_OF_WEEK) + 6) % 7;
 
@@ -3871,18 +3844,18 @@ public class MainActivity extends Activity {
 
             int day = 1;
 
-            for (
-                    int row = 0;
-                    row < 6 && day <= days;
-                    row++
-            ) {
+            for (int row = 0;
+                 row < 6 && day <= days;
+                 row++) {
 
                 LinearLayout r =
                         new LinearLayout(
                                 MainActivity.this
                         );
 
-                for (int col = 0; col < 7; col++) {
+                for (int col = 0;
+                     col < 7;
+                     col++) {
 
                     Button d =
                             btn("");
@@ -3893,10 +3866,9 @@ public class MainActivity extends Activity {
                             )
                     );
 
-                    if (
-                            (row == 0 && col < first) ||
-                            day > days
-                    ) {
+                    if ((row == 0 &&
+                            col < first) ||
+                            day > days) {
 
                         d.setEnabled(false);
 
@@ -3927,6 +3899,7 @@ public class MainActivity extends Activity {
                                 v -> {
 
                                     jd = dd;
+
                                     render();
                                 }
                         );
