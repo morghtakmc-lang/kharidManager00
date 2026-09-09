@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.ColorDrawable;
 import android.content.res.ColorStateList;
 import android.os.*;
 import android.view.*;
@@ -93,9 +94,8 @@ public class MainActivity extends Activity {
     void hidden(){EditText e=new EditText(this);e.setVisibility(View.GONE);inputs.add(e);}
     void addGrouping(EditText e){e.addTextChangedListener(new TextWatcher(){boolean busy;public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){}public void afterTextChanged(Editable ed){if(busy)return;String r=AppData.digits(ed.toString());if(r.isEmpty())return;busy=true;String f=AppData.fmt(r);e.setText(f);e.setSelection(f.length());busy=false;}});}
 
-    // Persian calendar: full current-year/month grid, with day selection.
     void pickDate(EditText target){
-        final PersianCalendarDialog dlg=new PersianCalendarDialog(this,target.getText().toString());
+        final PersianCalendarDialog dlg=new PersianCalendarDialog(this,target);
         dlg.show();
     }
 
@@ -205,6 +205,7 @@ public class MainActivity extends Activity {
         Button[] bs={f1,f2,f3,f4};for(int i=0;i<4;i++){final int st=i+1;bs[i].setOnClickListener(v->{status[0]=status[0]==st?0:st;updateFilterStyle.run();render.run();});}
         go.setOnClickListener(v->render.run());updateFilterStyle.run();render.run();Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("خریدهای ثبت‌شده");
     }
+
     JSONArray sortedPurchases(){JSONArray src=AppData.arr(data,"purchases");ArrayList<JSONObject> l=new ArrayList<>();for(int i=0;i<src.length();i++)l.add(src.optJSONObject(i));Collections.sort(l,(a,b)->b.optString("buyDate").compareTo(a.optString("buyDate")));JSONArray r=new JSONArray();for(JSONObject p:l)r.put(p);return r;}
 
     void details(JSONObject p){
@@ -220,19 +221,24 @@ public class MainActivity extends Activity {
         Button same=btn("👤 پرونده "+p.optString("buyer"));same.setOnClickListener(v->openPage(()->listPurchases(p.optString("buyer"))));add(same);
         Button del=btn("🗑 حذف");del.setOnClickListener(v->confirmDelete(p));add(del);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("جزئیات کامل خرید");
     }
+
     void confirmStatusChange(JSONObject p,String key,String title){
         boolean next=!p.optBoolean(key,false);
         String action=next?"فعال‌سازی":"غیرفعال‌سازی";
         new AlertDialog.Builder(this).setTitle("تأیید تغییر وضعیت").setMessage("آیا از "+action+" "+title+" این خرید مطمئن هستید؟").setPositiveButton("بله",(d,w)->{try{p.put(key,next);AppData.save(this,data);if("collected".equals(key)&&next)cancelAlarm(this,p);details(p);}catch(Exception ignored){}}).setNegativeButton("خیر",null).show();
     }
+
     JSONObject findPurchase(String id){JSONArray a=AppData.arr(data,"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p!=null&&id.equals(p.optString("id")))return p;}return null;}
+
     void confirmDelete(JSONObject p){new AlertDialog.Builder(this).setTitle("حذف خرید").setMessage("این خرید حذف شود؟").setPositiveButton("حذف",(d,w)->delete(p)).setNegativeButton("لغو",null).show();}
+
     void delete(JSONObject p){try{cancelAlarm(this,p);JSONArray a=AppData.arr(data,"purchases"),b=new JSONArray();for(int i=0;i<a.length();i++)if(!a.getJSONObject(i).optString("id").equals(p.optString("id")))b.put(a.getJSONObject(i));data.put("purchases",b);AppData.save(this,data);goHome();}catch(Exception ignored){}}
 
     void buyersPage(){
         base("خریداران و پرونده هر خریدار");EditText q=input("جستجوی نام خریدار");Button go=btn("🔎 جستجو");add(go);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
         Runnable render=()->{list.removeAllViews();JSONArray b=AppData.arr(data,"buyers");String s=q.getText().toString().trim();for(int i=0;i<b.length();i++){String name=b.optString(i);if(!s.isEmpty()&&!name.contains(s))continue;Button x=btn("👤 "+name);x.setOnClickListener(v->openPage(()->buyerFile(name)));list.addView(x);}};go.setOnClickListener(v->render.run());render.run();Button addb=btn("➕ افزودن خریدار");addb.setOnClickListener(v->addEntry("buyers","خریدار جدید",this::buyersPage));add(addb);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("خریداران");
     }
+
     void buyerFile(String buyer){
         base("پرونده خریدار: "+buyer);JSONArray a=AppData.arr(data,"purchases");int n=0,coll=0,alloc=0;long total=0,colAmt=0;ArrayList<JSONObject> noColl=new ArrayList<>(),noAlloc=new ArrayList<>();
         for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||!buyer.equals(p.optString("buyer")))continue;n++;long amt=toLong(p.optString("amount"));total+=amt;if(p.optBoolean("collected")){coll++;colAmt+=amt;}else noColl.add(p);if(p.optBoolean("allocated"))alloc++;else noAlloc.add(p);}
@@ -242,9 +248,13 @@ public class MainActivity extends Activity {
         all.setOnClickListener(v->openPage(()->listPurchases(buyer)));c1.setOnClickListener(v->openPage(()->listPurchasesWithStatus(buyer,1)));c2.setOnClickListener(v->openPage(()->listPurchasesWithStatus(buyer,2)));c3.setOnClickListener(v->openPage(()->listPurchasesWithStatus(buyer,3)));c4.setOnClickListener(v->openPage(()->listPurchasesWithStatus(buyer,4)));
         Button stat=btn("📊 آمار بازه زمانی");stat.setOnClickListener(v->buyerStats(buyer));add(stat);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده خریدار");
     }
+
     void addPurchaseNumberList(ArrayList<JSONObject> items){if(items.isEmpty()){add(tv("ندارد",14));return;}for(JSONObject p:items){Button b=btn("📄 "+p.optString("purchaseNo"));b.setOnClickListener(v->openPage(()->details(p)));add(b);}}
+
     void listPurchasesWithStatus(String buyer,int status){listPurchases(buyer,status);}
+
     void buyerStats(String buyer){base("آمار بازه‌ای: "+buyer);EditText f=input("از تاریخ");EditText t=input("تا تاریخ");f.setOnClickListener(v->pickDate(f));t.setOnClickListener(v->pickDate(t));Button b=btn("نمایش آمار");add(b);TextView out=tv("",15);add(out);b.setOnClickListener(v->{int n=0,c=0,a=0;long total=0;JSONArray p=AppData.arr(data,"purchases");for(int i=0;i<p.length();i++){JSONObject x=p.optJSONObject(i);if(x==null||!buyer.equals(x.optString("buyer")))continue;String d=x.optString("buyDate");if(!f.getText().toString().isEmpty()&&d.compareTo(f.getText().toString())<0)continue;if(!t.getText().toString().isEmpty()&&d.compareTo(t.getText().toString())>0)continue;n++;total+=toLong(x.optString("amount"));if(x.optBoolean("collected"))c++;if(x.optBoolean("allocated"))a++;}out.setText("تعداد خرید: "+n+"\nمجموع مبلغ: "+AppData.fmt(""+total)+" ریال\nوصول‌شده: "+c+"\nتخصیص‌شده: "+a);});Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("آمار");}
+
     long toLong(String s){try{return Long.parseLong(AppData.digits(s));}catch(Exception e){return 0;}}
 
     void deadlines(){
@@ -252,9 +262,11 @@ public class MainActivity extends Activity {
         LinearLayout dates=new LinearLayout(this);EditText f=new EditText(this),t=new EditText(this);f.setHint("از تاریخ");t.setHint("تا تاریخ");f.setOnClickListener(v->pickDate(f));t.setOnClickListener(v->pickDate(t));dates.addView(f,new LinearLayout.LayoutParams(0,60,1));dates.addView(t,new LinearLayout.LayoutParams(0,60,1));add(dates);Button show=btn("🔎 نمایش");add(show);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
         Runnable render=()->{list.removeAllViews();ArrayList<JSONObject> l=new ArrayList<>();JSONArray a=AppData.arr(data,"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||p.optBoolean("collected")||p.optString("mainDue").isEmpty())continue;if(mode.getSelectedItemPosition()==1){if(!f.getText().toString().isEmpty()&&p.optString("mainDue").compareTo(f.getText().toString())<0)continue;if(!t.getText().toString().isEmpty()&&p.optString("mainDue").compareTo(t.getText().toString())>0)continue;}l.add(p);}Collections.sort(l,(x,y)->x.optString("mainDue").compareTo(y.optString("mainDue")));for(JSONObject p:l){Button b=btn("👤 "+p.optString("buyer")+" | خرید "+p.optString("purchaseNo")+"\nسررسید اصلی: "+p.optString("mainDue")+(isSoon(p)?"  ⚠ نزدیک":""));b.setOnClickListener(v->openPage(()->details(p)));list.addView(b);}};show.setOnClickListener(v->render.run());render.run();Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("سررسیدها");
     }
+
     boolean isSoon(JSONObject p){String d=p==null?"":p.optString("mainDue");if(d.isEmpty()||p.optBoolean("collected",false))return false;long m=PersianDate.millis(d,"23:59");return m>=System.currentTimeMillis()&&m-System.currentTimeMillis()<7L*86400000L;}
 
     void manage(String key,String title){base(title);JSONArray a=AppData.arr(data,key);for(int i=0;i<a.length();i++){final int ix=i;LinearLayout r=new LinearLayout(this);TextView t=tv(a.optString(i),16);r.addView(t,new LinearLayout.LayoutParams(0,60,1));Button d=btn("حذف");d.setOnClickListener(v->{a.remove(ix);try{data.put(key,a);AppData.save(this,data);}catch(Exception ignored){}manage(key,title);});r.addView(d,new LinearLayout.LayoutParams(110,60));add(r);}Button ad=btn("➕ افزودن");ad.setOnClickListener(v->addEntry(key,"مورد جدید",()->manage(key,title)));add(ad);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen(title);}
+
     void addEntry(String key,String title,Runnable after){EditText e=new EditText(this);new AlertDialog.Builder(this).setTitle(title).setView(e).setPositiveButton("ذخیره",(d,w)->{try{String v=e.getText().toString().trim();if(v.isEmpty())return;JSONArray a=AppData.arr(data,key);for(int i=0;i<a.length();i++)if(v.equals(a.optString(i)))return;a.put(v);data.put(key,a);AppData.save(this,data);after.run();}catch(Exception ignored){}}).setNegativeButton("لغو",null).show();}
 
     void reports(){
@@ -262,6 +274,7 @@ public class MainActivity extends Activity {
         Runnable render=()->{list.removeAllViews();String s=q.getText().toString().trim();TreeSet<String> buyers=new TreeSet<>(),companies=new TreeSet<>();JSONArray a=sortedPurchases();for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);String blob=p.optString("buyer")+" "+p.optString("company")+" "+p.optString("purchaseNo");if(s.isEmpty()||blob.contains(s)){buyers.add(p.optString("buyer"));companies.add(p.optString("company"));}}for(String x:buyers){Button z=btn("👤 "+x);z.setOnClickListener(vv->openPage(()->reportSelection("خریدار: "+x,"buyer",x)));list.addView(z);}for(String x:companies){Button z=btn("🏢 "+x);z.setOnClickListener(vv->openPage(()->reportSelection("شرکت: "+x,"company",x)));list.addView(z);}};
         b.setOnClickListener(v->render.run());render.run();add(tv("ابتدا خریدار یا شرکت را انتخاب کنید؛ سپس خریدها را تیک بزنید و خروجی بگیرید.",13));Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("گزارش‌ها و خروجی Excel");
     }
+
     void reportSelection(String title,String filterKey,String filterVal){
         base(title);EditText q=input("");q.setHint("جستجو: شماره خرید / تاریخ / نام");LinearLayout dates=new LinearLayout(this);EditText f=new EditText(this);f.setHint("از تاریخ");f.setSingleLine(true);EditText t=new EditText(this);t.setHint("تا تاریخ");t.setSingleLine(true);f.setOnClickListener(v->pickDate(f));t.setOnClickListener(v->pickDate(t));dates.addView(f,new LinearLayout.LayoutParams(0,60,1));dates.addView(t,new LinearLayout.LayoutParams(0,60,1));add(dates);
         LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);ArrayList<CheckBox> checks=new ArrayList<>();ArrayList<JSONObject> objs=new ArrayList<>();JSONArray a=sortedPurchases();
@@ -272,40 +285,172 @@ public class MainActivity extends Activity {
         Button ex=btn("📊 خروجی Excel موارد انتخاب‌شده");ex.setOnClickListener(v->{JSONArray r=new JSONArray();for(int i=0;i<checks.size();i++)if(checks.get(i).isChecked()&&checks.get(i).getVisibility()==View.VISIBLE)r.put(objs.get(i));if(r.length()==0){for(int i=0;i<checks.size();i++)if(checks.get(i).getVisibility()==View.VISIBLE)r.put(objs.get(i));}exportExcel(r,"report_"+safe(filterVal));});add(ex);
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen(title);for(CheckBox c:checks)styleReportCheck(c);
     }
+
     void styleReportCheck(CheckBox c){c.setTextColor(UiManager.text(this));c.setTextSize(UiManager.bodySize(this));c.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);c.setPadding(UiManager.dp(this,10),UiManager.dp(this,8),UiManager.dp(this,10),UiManager.dp(this,8));if(Build.VERSION.SDK_INT>=21){int[][] states={{android.R.attr.state_checked},{-android.R.attr.state_checked}};int[] colors={UiManager.primary(this),Color.GRAY};c.setButtonTintList(new ColorStateList(states,colors));}c.setOnCheckedChangeListener((b,checked)->{if(Build.VERSION.SDK_INT>=21){b.setBackgroundColor(checked?UiManager.secondary(this):Color.TRANSPARENT);}});}
+
     String safe(String s){return s.replaceAll("[\\\\/:*?\"<>|]","_");}
+
     void exportExcel(JSONArray a,String name){try{String[] h={"نام خریدار","نهاده","شماره خرید","وزن","فی","نوع پرداخت","مبلغ خرید","تاریخ خرید","مقدار ذرت","مقدار سویا","نام شرکت","تاریخ اصلی سررسید","وصول شد","تخصیص شد"};String[] k={"buyer","commodity","purchaseNo","weight","fee","payment","amount","buyDate","corn","soy","company","mainDue","collected","allocated"};StringBuilder x=new StringBuilder("\uFEFF");for(String s:h)x.append(s).append("\t");x.append("\n");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);for(String z:k)x.append(xml(p.optString(z,""))).append("\t");x.append("\n");}File f=new File(getCacheDir(),name+".xls");FileOutputStream o=new FileOutputStream(f);o.write(x.toString().getBytes("UTF-8"));o.close();Intent in=new Intent(Intent.ACTION_SEND);in.setType("application/vnd.ms-excel");in.putExtra(Intent.EXTRA_STREAM,FileProvider.getUriForFile(this,"com.morghtak.kharidmanager.fileprovider",f));in.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(in,"ارسال / ذخیره Excel"));}catch(Exception e){Toast.makeText(this,"خطا در ساخت Excel",Toast.LENGTH_LONG).show();}}
+
     String xml(String s){return s.replace("&","&amp;").replace("\t"," ").replace("\n"," ").replace("\r"," ");}
 
     void backup(){base("پشتیبان‌گیری و بازیابی");add(tv("برای امنیت اطلاعات، نسخه پشتیبان تهیه کنید.",16));Button b=btn("💾 ساخت فایل پشتیبان");b.setOnClickListener(v->doBackup());add(b);b=btn("📥 بازیابی از فایل پشتیبان");b.setOnClickListener(v->{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,91);});add(b);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پشتیبان‌گیری و بازیابی");}
+
     void doBackup(){try{File f=new File(getCacheDir(),"kharidmanager_backup.json");FileOutputStream o=new FileOutputStream(f);o.write(data.toString(2).getBytes("UTF-8"));o.close();Intent i=new Intent(Intent.ACTION_SEND);i.setType("application/json");i.putExtra(Intent.EXTRA_STREAM,FileProvider.getUriForFile(this,"com.morghtak.kharidmanager.fileprovider",f));i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivity(Intent.createChooser(i,"ذخیره فایل پشتیبان"));}catch(Exception e){Toast.makeText(this,"خطا در پشتیبان‌گیری",Toast.LENGTH_LONG).show();}}
+
     @Override protected void onActivityResult(int r,int c,Intent i){super.onActivityResult(r,c,i);UiManager.handleLogoResult(this,r,c,i);if(r==91&&c==RESULT_OK&&i!=null&&i.getData()!=null)try{InputStream in=getContentResolver().openInputStream(i.getData());ByteArrayOutputStream o=new ByteArrayOutputStream();byte[] b=new byte[4096];int n;while((n=in.read(b))>0)o.write(b,0,n);in.close();data=new JSONObject(new String(o.toByteArray(),"UTF-8"));AppData.save(this,data);goHome();}catch(Exception e){Toast.makeText(this,"فایل پشتیبان معتبر نیست",Toast.LENGTH_LONG).show();}}
+
     public static JSONObject findStatic(Context c,String id){try{JSONArray a=AppData.arr(AppData.root(c),"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p!=null&&id!=null&&id.equals(p.optString("id")))return p;}}catch(Exception ignored){}return null;}
+
     public static void schedule(Context c,JSONObject p){try{if(!p.optBoolean("alarm")||p.optBoolean("collected"))return;long at=PersianDate.millis(p.optString("mainDue"),p.optString("alarmTime","10:00"))-p.optInt("alarmDays",1)*86400000L;if(p.optBoolean("alarmRepeat")&&at<=System.currentTimeMillis()){while(at<=System.currentTimeMillis())at+=86400000L;}if(at<=System.currentTimeMillis())return;AlarmManager am=(AlarmManager)c.getSystemService(ALARM_SERVICE);Intent in=new Intent(c,AlarmReceiver.class);in.putExtra("id",p.optString("id"));in.putExtra("title","خرید "+p.optString("purchaseNo")+" - "+p.optString("buyer"));PendingIntent pi=PendingIntent.getBroadcast(c,p.optString("id").hashCode(),in,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);if(Build.VERSION.SDK_INT>=31&&am.canScheduleExactAlarms())am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);}catch(Exception ignored){}}
+
     public static void scheduleNext(Context c,JSONObject p){try{if(!p.optBoolean("alarmRepeat")||p.optBoolean("collected"))return;AlarmManager am=(AlarmManager)c.getSystemService(ALARM_SERVICE);Calendar cal=Calendar.getInstance();cal.add(Calendar.DAY_OF_YEAR,1);String[] hm=p.optString("alarmTime","10:00").split(":");try{cal.set(Calendar.HOUR_OF_DAY,Integer.parseInt(hm[0]));cal.set(Calendar.MINUTE,Integer.parseInt(hm[1]));}catch(Exception ignored){}cal.set(Calendar.SECOND,0);cal.set(Calendar.MILLISECOND,0);long at=cal.getTimeInMillis();Intent in=new Intent(c,AlarmReceiver.class);in.putExtra("id",p.optString("id"));in.putExtra("title","خرید "+p.optString("purchaseNo")+" - "+p.optString("buyer"));PendingIntent pi=PendingIntent.getBroadcast(c,p.optString("id").hashCode(),in,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);if(Build.VERSION.SDK_INT>=31&&am.canScheduleExactAlarms())am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);}catch(Exception ignored){}}
+
     public static void cancelAlarm(Context c,JSONObject p){try{AlarmManager am=(AlarmManager)c.getSystemService(ALARM_SERVICE);Intent in=new Intent(c,AlarmReceiver.class);PendingIntent pi=PendingIntent.getBroadcast(c,p.optString("id").hashCode(),in,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);am.cancel(pi);pi.cancel();}catch(Exception ignored){}}
 
-    // Full Persian calendar dialog.
     class PersianCalendarDialog extends Dialog {
         EditText target; int jy,jm,jd; TextView title; LinearLayout grid;
-        PersianCalendarDialog(Context c,EditText t){super(c);target=t;String current=t==null?"":t.getText().toString();int[] d=parseJ(current);if(d==null)d=parseJ(PersianDate.today());jy=d[0];jm=d[1];jd=d[2];}
-        int[] parseJ(String s){try{String[] a=s.split("/");if(a.length==3)return new int[]{Integer.parseInt(AppData.digits(a[0])),Integer.parseInt(AppData.digits(a[1])),Integer.parseInt(AppData.digits(a[2]))};}catch(Exception ignored){}return null;}
+
+        PersianCalendarDialog(Context c,EditText t){
+            super(c);
+            target=t;
+            String current=t==null?"":t.getText().toString();
+            int[] d=parseJ(current);
+            if(d==null)d=parseJ(PersianDate.today());
+            jy=d[0];jm=d[1];jd=d[2];
+        }
+
+        int[] parseJ(String s){
+            try{
+                String[] a=s.split("/");
+                if(a.length==3)return new int[]{Integer.parseInt(AppData.digits(a[0])),Integer.parseInt(AppData.digits(a[1])),Integer.parseInt(AppData.digits(a[2]))};
+            }catch(Exception ignored){}
+            return null;
+        }
+
         @Override protected void onCreate(Bundle b){
-            super.onCreate(b);LinearLayout box=new LinearLayout(MainActivity.this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(UiManager.dp(MainActivity.this,10),UiManager.dp(MainActivity.this,8),UiManager.dp(MainActivity.this,10),UiManager.dp(MainActivity.this,8));box.setBackgroundColor(UiManager.background(MainActivity.this));
-            title=new TextView(MainActivity.this);title.setGravity(Gravity.CENTER);title.setTextSize(UiManager.titleSize(MainActivity.this));title.setTypeface(UiManager.selectedTypeface(MainActivity.this,Typeface.BOLD));title.setTextColor(UiManager.text(MainActivity.this));box.addView(title,new LinearLayout.LayoutParams(-1,UiManager.dp(MainActivity.this,56)));
-            LinearLayout nav=new LinearLayout(MainActivity.this);Button prevYear=btn("‹ سال قبل"),prev=btn("‹ ماه قبل"),next=btn("ماه بعد ›"),nextYear=btn("سال بعد ›");nav.addView(prevYear,new LinearLayout.LayoutParams(0,UiManager.dp(thisContext(),48),1));nav.addView(prev,new LinearLayout.LayoutParams(0,UiManager.dp(thisContext(),48),1));nav.addView(next,new LinearLayout.LayoutParams(0,UiManager.dp(thisContext(),48),1));nav.addView(nextYear,new LinearLayout.LayoutParams(0,UiManager.dp(thisContext(),48),1));box.addView(nav);
-            ScrollView sv=new ScrollView(MainActivity.this);grid=new LinearLayout(MainActivity.this);grid.setOrientation(LinearLayout.VERTICAL);sv.addView(grid,new ViewGroup.LayoutParams(-1,-2));box.addView(sv,new LinearLayout.LayoutParams(-1,UiManager.dp(MainActivity.this,330)));
-            LinearLayout bottom=new LinearLayout(MainActivity.this);Button cancel=btn("لغو"),ok=btn("تأیید");bottom.addView(cancel,new LinearLayout.LayoutParams(0,UiManager.dp(MainActivity.this,50),1));bottom.addView(ok,new LinearLayout.LayoutParams(0,UiManager.dp(MainActivity.this,50),1));box.addView(bottom);
-            prevYear.setOnClickListener(v->{jy--;jd=Math.min(jd,monthDays(jy,jm));render();});nextYear.setOnClickListener(v->{jy++;jd=Math.min(jd,monthDays(jy,jm));render();});prev.setOnClickListener(v->{jm--;if(jm<1){jm=12;jy--;}jd=Math.min(jd,monthDays(jy,jm));render();});next.setOnClickListener(v->{jm++;if(jm>12){jm=1;jy++;}jd=Math.min(jd,monthDays(jy,jm));render();});cancel.setOnClickListener(v->dismiss());ok.setOnClickListener(v->{if(target!=null)target.setText(String.format(Locale.US,"%04d/%02d/%02d",jy,jm,jd));dismiss();});setContentView(box);Window w=getWindow();if(w!=null){w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));w.setLayout(-1,-2);}render();
+            super.onCreate(b);
+            LinearLayout box=new LinearLayout(MainActivity.this);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setPadding(UiManager.dp(MainActivity.this,10),UiManager.dp(MainActivity.this,8),UiManager.dp(MainActivity.this,10),UiManager.dp(MainActivity.this,8));
+            box.setBackgroundColor(UiManager.background(MainActivity.this));
+
+            title=new TextView(MainActivity.this);
+            title.setGravity(Gravity.CENTER);
+            title.setTextSize(UiManager.titleSize(MainActivity.this));
+            title.setTypeface(UiManager.selectedTypeface(MainActivity.this,Typeface.BOLD));
+            title.setTextColor(UiManager.text(MainActivity.this));
+            box.addView(title,new LinearLayout.LayoutParams(-1,UiManager.dp(MainActivity.this,56)));
+
+            LinearLayout nav=new LinearLayout(MainActivity.this);
+            Button prevYear=btn("‹ سال قبل"),prev=btn("‹ ماه قبل"),next=btn("ماه بعد ›"),nextYear=btn("سال بعد ›");
+            nav.addView(prevYear,new LinearLayout.LayoutParams(0,UiManager.dp(thisContext(),48),1));
+            nav.addView(prev,new LinearLayout.LayoutParams(0,UiManager.dp(thisContext(),48),1));
+            nav.addView(next,new LinearLayout.LayoutParams(0,UiManager.dp(thisContext(),48),1));
+            nav.addView(nextYear,new LinearLayout.LayoutParams(0,UiManager.dp(thisContext(),48),1));
+            box.addView(nav);
+
+            ScrollView sv=new ScrollView(MainActivity.this);
+            grid=new LinearLayout(MainActivity.this);
+            grid.setOrientation(LinearLayout.VERTICAL);
+            sv.addView(grid,new ViewGroup.LayoutParams(-1,-2));
+            box.addView(sv,new LinearLayout.LayoutParams(-1,UiManager.dp(MainActivity.this,330)));
+
+            LinearLayout bottom=new LinearLayout(MainActivity.this);
+            Button cancel=btn("لغو"),ok=btn("تأیید");
+            bottom.addView(cancel,new LinearLayout.LayoutParams(0,UiManager.dp(MainActivity.this,50),1));
+            bottom.addView(ok,new LinearLayout.LayoutParams(0,UiManager.dp(MainActivity.this,50),1));
+            box.addView(bottom);
+
+            prevYear.setOnClickListener(v->{jy--;jd=Math.min(jd,monthDays(jy,jm));render();});
+            nextYear.setOnClickListener(v->{jy++;jd=Math.min(jd,monthDays(jy,jm));render();});
+            prev.setOnClickListener(v->{jm--;if(jm<1){jm=12;jy--;}jd=Math.min(jd,monthDays(jy,jm));render();});
+            next.setOnClickListener(v->{jm++;if(jm>12){jm=1;jy++;}jd=Math.min(jd,monthDays(jy,jm));render();});
+            cancel.setOnClickListener(v->dismiss());
+            ok.setOnClickListener(v->{if(target!=null)target.setText(String.format(Locale.US,"%04d/%02d/%02d",jy,jm,jd));dismiss();});
+
+            setContentView(box);
+            Window w=getWindow();
+            if(w!=null){
+                w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                w.setLayout(-1,-2);
+            }
+            render();
         }
+
         Context thisContext(){return MainActivity.this;}
+
         int monthDays(int y,int m){return m<=6?31:(m<=11?30:(isLeap(y)?30:29));}
-        boolean isLeap(int y){long a=PersianDate.millis(String.format(Locale.US,"%04d/%02d/%02d",y,12,1),"00:00");long z=PersianDate.millis(String.format(Locale.US,"%04d/%02d/%02d",y+1,1,1),"00:00");return z-a>365L*86400000L;}
-        void render(){
-            int body=Math.max(12,Math.round(UiManager.bodySize(MainActivity.this)));int button=Math.max(12,Math.round(UiManager.buttonSize(MainActivity.this)));String font=UiManager.font(MainActivity.this);title.setText("تقویم شمسی  "+jy+" / "+monthName(jm));title.setTypeface(Typeface.create(font,Typeface.BOLD));grid.removeAllViews();String[] wd={"ش","ی","د","س","چ","پ","ج"};LinearLayout heads=new LinearLayout(MainActivity.this);for(String s:wd){TextView x=new TextView(MainActivity.this);x.setText(s);x.setTextSize(body-1);x.setTypeface(Typeface.create(font,Typeface.BOLD));x.setTextColor(UiManager.text(MainActivity.this));x.setGravity(Gravity.CENTER);heads.addView(x,new LinearLayout.LayoutParams(0,UiManager.dp(MainActivity.this,36),1));}grid.addView(heads);
-            int[] g=PersianDate.toGregorian(jy,jm,1);Calendar c=Calendar.getInstance();c.set(g[0],g[1]-1,g[2]);int first=(c.get(Calendar.DAY_OF_WEEK)%7);int days=monthDays(jy,jm),day=1;
-            for(int row=0;row<6&&day<=days;row++){LinearLayout r=new LinearLayout(MainActivity.this);for(int col=0;col<7;col++){Button d=btn("");d.setTextSize(button);d.setTypeface(Typeface.create(font,Typeface.BOLD));d.setMinHeight(UiManager.dp(MainActivity.this,42));if((row==0&&col<first)||day>days)d.setEnabled(false);else{final int dd=day;d.setText(""+day);if(day==jd){d.setSelected(true);d.setBackgroundColor(UiManager.primary(MainActivity.this));d.setTextColor(Color.WHITE);}else{d.setBackgroundColor(UiManager.card(MainActivity.this));d.setTextColor(UiManager.text(MainActivity.this));}d.setOnClickListener(v->{jd=dd;render();});day++;}r.addView(d,new LinearLayout.LayoutParams(0,UiManager.dp(MainActivity.this,46),1));}grid.addView(r);}
+
+        boolean isLeap(int y){
+            long a=PersianDate.millis(String.format(Locale.US,"%04d/%02d/%02d",y,12,1),"00:00");
+            long z=PersianDate.millis(String.format(Locale.US,"%04d/%02d/%02d",y+1,1,1),"00:00");
+            return z-a>365L*86400000L;
         }
-        String monthName(int m){String[] n={"فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"};return n[m-1];}
+
+        void render(){
+            int body=Math.max(12,Math.round(UiManager.bodySize(MainActivity.this)));
+            int button=Math.max(12,Math.round(UiManager.buttonSize(MainActivity.this)));
+            String font=UiManager.font(MainActivity.this);
+
+            title.setText("تقویم شمسی  "+jy+" / "+monthName(jm));
+            title.setTypeface(Typeface.create(font,Typeface.BOLD));
+            grid.removeAllViews();
+
+            String[] wd={"ش","ی","د","س","چ","پ","ج"};
+            LinearLayout heads=new LinearLayout(MainActivity.this);
+
+            for(String s:wd){
+                TextView x=new TextView(MainActivity.this);
+                x.setText(s);
+                x.setTextSize(body-1);
+                x.setTypeface(Typeface.create(font,Typeface.BOLD));
+                x.setTextColor(UiManager.text(MainActivity.this));
+                x.setGravity(Gravity.CENTER);
+                heads.addView(x,new LinearLayout.LayoutParams(0,UiManager.dp(MainActivity.this,36),1));
+            }
+
+            grid.addView(heads);
+
+            int[] g=PersianDate.toGregorian(jy,jm,1);
+            Calendar c=Calendar.getInstance();
+            c.set(g[0],g[1]-1,g[2]);
+            int first=(c.get(Calendar.DAY_OF_WEEK)%7);
+            int days=monthDays(jy,jm),day=1;
+
+            for(int row=0;row<6&&day<=days;row++){
+                LinearLayout r=new LinearLayout(MainActivity.this);
+                for(int col=0;col<7;col++){
+                    Button d=btn("");
+                    d.setTextSize(button);
+                    d.setTypeface(Typeface.create(font,Typeface.BOLD));
+                    d.setMinHeight(UiManager.dp(MainActivity.this,42));
+
+                    if((row==0&&col<first)||day>days)d.setEnabled(false);
+                    else{
+                        final int dd=day;
+                        d.setText(""+day);
+                        if(day==jd){
+                            d.setSelected(true);
+                            d.setBackgroundColor(UiManager.primary(MainActivity.this));
+                            d.setTextColor(Color.WHITE);
+                        }else{
+                            d.setBackgroundColor(UiManager.card(MainActivity.this));
+                            d.setTextColor(UiManager.text(MainActivity.this));
+                        }
+                        d.setOnClickListener(v->{jd=dd;render();});
+                        day++;
+                    }
+
+                    r.addView(d,new LinearLayout.LayoutParams(0,UiManager.dp(MainActivity.this,46),1));
+                }
+                grid.addView(r);
+            }
+        }
+
+        String monthName(int m){
+            String[] n={"فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"};
+            return n[m-1];
+        }
     }
 }
