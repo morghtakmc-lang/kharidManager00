@@ -4,6 +4,7 @@ import android.app.*;
 import android.content.*;
 import android.graphics.*;
 import android.graphics.drawable.*;
+import android.os.Build;
 import android.view.*;
 import android.widget.*;
 import android.text.*;
@@ -36,32 +37,23 @@ public final class UiManager {
     public static void styleText(Context c,TextView v){
         v.setFontFeatureSettings("kern");
         if(v instanceof Button){
-            v.setTextSize(Math.min(buttonSize(c),17f));v.setTypeface(selectedTypeface(c,Typeface.BOLD));v.setTextColor(Color.WHITE);
-            v.setGravity(Gravity.CENTER);v.setPadding(dp(c,10),dp(c,7),dp(c,10),dp(c,7));v.setMinHeight(dp(c,50));v.setMaxLines(3);
-            v.setBackground(bg(primary(c),radius(c),primary(c),false));
+            v.setTextSize(Math.min(buttonSize(c),17f));v.setTypeface(selectedTypeface(c,Typeface.BOLD));v.setTextColor(Color.WHITE);v.setGravity(Gravity.CENTER);v.setPadding(dp(c,10),dp(c,7),dp(c,10),dp(c,7));v.setMinHeight(dp(c,50));v.setMaxLines(3);v.setEllipsize(TextUtils.TruncateAt.END);v.setBackground(bg(primary(c),radius(c),primary(c),false));
         } else if(v instanceof EditText){
-            v.setTextSize(fieldSize(c));v.setTypeface(selectedTypeface(c,Typeface.NORMAL));v.setTextColor(text(c));v.setHintTextColor(textSecondary(c));
-            v.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);v.setPadding(dp(c,14),dp(c,8),dp(c,14),dp(c,8));v.setSingleLine(true);
-            v.setBackground(bg(card(c),radius(c),secondary(c),true));
+            v.setTextSize(fieldSize(c));v.setTypeface(selectedTypeface(c,Typeface.NORMAL));v.setTextColor(text(c));v.setHintTextColor(textSecondary(c));v.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);v.setPadding(dp(c,14),dp(c,8),dp(c,14),dp(c,8));v.setSingleLine(true);v.setBackground(bg(card(c),radius(c),secondary(c),true));
         } else {
-            v.setTextSize(bodySize(c));v.setTypeface(selectedTypeface(c,Typeface.NORMAL));v.setTextColor(text(c));
-            v.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);v.setLineSpacing(0,1.18f);
+            v.setTextSize(bodySize(c));v.setTypeface(selectedTypeface(c,Typeface.NORMAL));v.setTextColor(text(c));v.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);v.setLineSpacing(0,1.18f);v.setMaxLines(6);
         }
     }
     public static void decorate(final Activity a,final LinearLayout root,final String title){
         final Context c=a;root.setBackgroundColor(background(c));root.setPadding(dp(c,10),dp(c,8),dp(c,10),dp(c,18));
         if(root.getChildCount()>0&&root.getChildAt(0) instanceof TextView){
-            TextView h=(TextView)root.getChildAt(0);h.setTextSize(titleSize(c));h.setTypeface(selectedTypeface(c,Typeface.BOLD));h.setTextColor(Color.WHITE);h.setGravity(Gravity.CENTER);
-            h.setPadding(dp(c,16),dp(c,8),dp(c,16),dp(c,8));h.setBackground(bg(primary(c),radius(c),primary(c),false));
-            if(h.getLayoutParams()!=null)h.getLayoutParams().height=dp(c,64);
+            TextView h=(TextView)root.getChildAt(0);h.setTextSize(titleSize(c));h.setTypeface(selectedTypeface(c,Typeface.BOLD));h.setTextColor(Color.WHITE);h.setGravity(Gravity.CENTER);h.setPadding(dp(c,16),dp(c,8),dp(c,16),dp(c,8));h.setBackground(bg(primary(c),radius(c),primary(c),false));if(h.getLayoutParams()!=null)h.getLayoutParams().height=dp(c,64);
         }
         if("مدیریت خرید و سررسید".equals(title)){
-            ImageView logo=new ImageView(c);logo.setImageDrawable(loadLogo(c));logo.setAdjustViewBounds(true);logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);logo.setPadding(0,dp(c,6),0,dp(c,6));
-            root.addView(logo,1,new LinearLayout.LayoutParams(-1,dp(c,155)));
+            ImageView logo=new ImageView(c);logo.setImageDrawable(loadLogo(c));logo.setAdjustViewBounds(true);logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);logo.setPadding(0,dp(c,6),0,dp(c,6));root.addView(logo,1,new LinearLayout.LayoutParams(-1,dp(c,155)));
             Button settings=new Button(c);settings.setText("⚙ تنظیمات مدیر");styleText(c,settings);settings.setOnClickListener(v->showSettings(a));root.addView(settings,new LinearLayout.LayoutParams(-1,dp(c,58)));
         }
-        styleTree(c,root);
-        NestedScrollView scroll=new NestedScrollView(c);scroll.setFillViewport(true);scroll.setClipToPadding(false);ViewGroup parent=(ViewGroup)root.getParent();if(parent!=null)parent.removeView(root);scroll.addView(root,new ViewGroup.LayoutParams(-1,-2));a.setContentView(scroll);
+        styleTree(c,root);NestedScrollView scroll=new NestedScrollView(c);scroll.setFillViewport(true);scroll.setClipToPadding(false);ViewGroup parent=(ViewGroup)root.getParent();if(parent!=null)parent.removeView(root);scroll.addView(root,new ViewGroup.LayoutParams(-1,-2));a.setContentView(scroll);
         if(Build.VERSION.SDK_INT>=21){a.getWindow().setStatusBarColor(primary(c));a.getWindow().setNavigationBarColor(dark(c)?Color.BLACK:background(c));}
     }
     private static Drawable loadLogo(Context c){File f=new File(c.getFilesDir(),"company_logo.png");if(f.exists())return Drawable.createFromPath(f.getAbsolutePath());int id=c.getResources().getIdentifier("company_logo","drawable",c.getPackageName());return id==0?new ColorDrawable(background(c)):c.getResources().getDrawable(id);}
@@ -75,8 +67,7 @@ public final class UiManager {
         addTitle(box,a,"تنظیمات ظاهری و مدیریتی");addInfo(box,a,"تغییرات را ابتدا در پیش‌نمایش ببینید؛ ذخیره اعمال می‌کند و لغو هیچ تغییری نمی‌دهد.");
         addInfo(box,a,"نام شرکت (فقط نمونه پیش‌نمایش)");final EditText sampleName=edit(a,"مثال: نام شرکت نمونه");sampleName.setText("نام شرکت نمونه");box.addView(sampleName,lp());
         addInfo(box,a,"پیش‌نمایش زنده");final LinearLayout preview=new LinearLayout(a);preview.setOrientation(LinearLayout.VERTICAL);preview.setPadding(dp(a,12),dp(a,12),dp(a,12),dp(a,12));box.addView(preview,lp());
-        final String[] fontValues={"sans-serif","sans-serif-medium","sans-serif-condensed","sans-serif-light","serif","monospace"};
-        final String[] fontNames={"پیش‌فرض","متوسط","فشرده","باریک","کلاسیک","تک‌فاصله"};
+        final String[] fontValues={"sans-serif","sans-serif-medium","sans-serif-condensed","sans-serif-light","serif","monospace"};final String[] fontNames={"پیش‌فرض","متوسط","فشرده","باریک","کلاسیک","تک‌فاصله"};
         final Spinner font=spinner(a,fontNames);selectFont(font,fontValues,font(a));box.addView(label(a,"نوع فونت"),lp());box.addView(font,lp());
         final SeekBar body=seek(a,11,26,(int)bodySize(a));TextView bodyL=label(a,"اندازه متن: "+(int)bodySize(a));box.addView(bodyL,lp());box.addView(body,lp());
         final SeekBar title=seek(a,17,32,(int)titleSize(a));TextView titleL=label(a,"اندازه عنوان: "+(int)titleSize(a));box.addView(titleL,lp());box.addView(title,lp());
@@ -92,14 +83,7 @@ public final class UiManager {
         final EditText newPin=edit(a,"رمز جدید مدیر (خالی = بدون تغییر)");newPin.setInputType(2|0x00000010);box.addView(newPin,lp());
         Button save=button(a,"✓ ذخیره و اعمال تنظیمات");Button cancel=button(a,"لغو");box.addView(save,lp());box.addView(cancel,lp());
         final AlertDialog dlg=new AlertDialog.Builder(a).setTitle("تنظیمات مدیر").setView(sv).create();
-        final Runnable refreshPreview=()->{
-            preview.removeAllViews();boolean isDark=darkBox.isChecked();int previewBg=isDark?Color.rgb(30,30,30):tempBackground[0];int previewText=isDark?Color.WHITE:tempText[0];int previewCard=isDark?Color.rgb(45,45,45):tempCard[0];
-            String selectedFont=fontValues[Math.max(0,Math.min(font.getSelectedItemPosition(),fontValues.length-1))];preview.setBackgroundColor(previewBg);
-            TextView h=label(a,sampleName.getText().toString());h.setTextSize(title.getProgress()+17);h.setTypeface(Typeface.create(selectedFont,Typeface.BOLD));h.setTextColor(Color.WHITE);h.setGravity(Gravity.CENTER);h.setBackground(bg(tempPrimary[0],radius.getProgress()+0f,tempPrimary[0],false));h.setPadding(dp(a,8),dp(a,8),dp(a,8),dp(a,8));preview.addView(h,lp());
-            TextView bodyV=label(a,"این متن نمونه برای مشاهده تغییر فونت، اندازه و رنگ است.\nAa 12345");bodyV.setTextSize(body.getProgress()+11);bodyV.setTypeface(Typeface.create(selectedFont,Typeface.NORMAL));bodyV.setTextColor(previewText);preview.addView(bodyV,lp());
-            Button bv=button(a,"دکمه نمونه");bv.setTextSize(button.getProgress()+12);bv.setTypeface(Typeface.create(selectedFont,Typeface.BOLD));bv.setBackground(bg(tempPrimary[0],radius.getProgress()+0f,tempPrimary[0],false));preview.addView(bv,lp());
-            EditText ev=edit(a,"نمونه فیلد");ev.setTextSize(field.getProgress()+12);ev.setTypeface(Typeface.create(selectedFont,Typeface.NORMAL));ev.setTextColor(previewText);ev.setHintTextColor(isDark?Color.rgb(190,190,190):textSecondary(a));ev.setBackground(bg(previewCard,radius.getProgress()+0f,tempPrimary[0],true));preview.addView(ev,lp());
-        };
+        final Runnable refreshPreview=()->{preview.removeAllViews();boolean isDark=darkBox.isChecked();int previewBg=isDark?Color.rgb(30,30,30):tempBackground[0];int previewText=isDark?Color.WHITE:tempText[0];int previewCard=isDark?Color.rgb(45,45,45):tempCard[0];String selectedFont=fontValues[Math.max(0,Math.min(font.getSelectedItemPosition(),fontValues.length-1))];preview.setBackgroundColor(previewBg);TextView h=label(a,sampleName.getText().toString());h.setTextSize(title.getProgress()+17);h.setTypeface(Typeface.create(selectedFont,Typeface.BOLD));h.setTextColor(Color.WHITE);h.setGravity(Gravity.CENTER);h.setBackground(bg(tempPrimary[0],radius.getProgress()+0f,tempPrimary[0],false));h.setPadding(dp(a,8),dp(a,8),dp(a,8),dp(a,8));preview.addView(h,lp());TextView bodyV=label(a,"این متن نمونه برای مشاهده تغییر فونت، اندازه و رنگ است.\nAa 12345");bodyV.setTextSize(body.getProgress()+11);bodyV.setTypeface(Typeface.create(selectedFont,Typeface.NORMAL));bodyV.setTextColor(previewText);preview.addView(bodyV,lp());Button bv=button(a,"دکمه نمونه");bv.setTextSize(button.getProgress()+12);bv.setTypeface(Typeface.create(selectedFont,Typeface.BOLD));bv.setBackground(bg(tempPrimary[0],radius.getProgress()+0f,tempPrimary[0],false));preview.addView(bv,lp());EditText ev=edit(a,"نمونه فیلد");ev.setTextSize(field.getProgress()+12);ev.setTypeface(Typeface.create(selectedFont,Typeface.NORMAL));ev.setTextColor(previewText);ev.setHintTextColor(isDark?Color.rgb(190,190,190):textSecondary(a));ev.setBackground(bg(previewCard,radius.getProgress()+0f,tempPrimary[0],true));preview.addView(ev,lp());};
         refreshRef[0]=refreshPreview;
         SeekBar.OnSeekBarChangeListener listener=new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar s,int pos,boolean fromUser){bodyL.setText("اندازه متن: "+(body==s?pos+11:body.getProgress()+11));titleL.setText("اندازه عنوان: "+(title==s?pos+17:title.getProgress()+17));buttonL.setText("اندازه نوشته دکمه: "+(button==s?pos+12:button.getProgress()+12));fieldL.setText("اندازه نوشته فیلد: "+(field==s?pos+12:field.getProgress()+12));radiusL.setText("گردی گوشه‌ها: "+radius.getProgress());spacingL.setText("فاصله عناصر: "+(spacing.getProgress()+4));refreshPreview.run();}public void onStartTrackingTouch(SeekBar s){}public void onStopTrackingTouch(SeekBar s){}};
         body.setOnSeekBarChangeListener(listener);title.setOnSeekBarChangeListener(listener);button.setOnSeekBarChangeListener(listener);field.setOnSeekBarChangeListener(listener);radius.setOnSeekBarChangeListener(listener);spacing.setOnSeekBarChangeListener(listener);
@@ -107,36 +91,18 @@ public final class UiManager {
         sampleName.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){refreshPreview.run();}public void afterTextChanged(Editable e){}});
         darkBox.setOnCheckedChangeListener((b,v)->refreshPreview.run());refreshPreview.run();
         save.setOnClickListener(v->{SharedPreferences.Editor e=p(a).edit();int fontPos=Math.max(0,Math.min(font.getSelectedItemPosition(),fontValues.length-1));e.putString("font",fontValues[fontPos]);e.putFloat("body",body.getProgress()+11);e.putFloat("title",title.getProgress()+17);e.putFloat("button",button.getProgress()+12);e.putFloat("field",field.getProgress()+12);e.putFloat("radius",radius.getProgress());e.putFloat("spacing",spacing.getProgress()+4);e.putBoolean("dark",darkBox.isChecked());e.putInt("primary",tempPrimary[0]);e.putInt("background",tempBackground[0]);e.putInt("card",tempCard[0]);e.putInt("text",tempText[0]);String np=newPin.getText().toString().trim();if(!np.isEmpty())e.putString("pin",np);e.apply();if(resetLogoRequested[0]){File f=new File(a.getFilesDir(),"company_logo.png");if(f.exists())f.delete();}dlg.dismiss();a.recreate();});
-        cancel.setOnClickListener(v->dlg.dismiss());dlg.setOnCancelListener(d->{});dlg.show();
+        cancel.setOnClickListener(v->dlg.dismiss());dlg.setOnCancelListener(d->{});
+        dlg.show();
     }
-    private static void addPalette(LinearLayout box,Activity a,String title,int[] holder,final Runnable[] refreshRef){
-        TextView l=label(a,title);box.addView(l,lp());LinearLayout row=new LinearLayout(a);row.setOrientation(LinearLayout.HORIZONTAL);int[] colors={Color.WHITE,Color.BLACK,Color.rgb(8,127,91),Color.rgb(235,246,241),Color.rgb(35,45,40),Color.rgb(245,245,245),Color.rgb(30,90,150),Color.rgb(170,60,60),Color.rgb(220,170,50)};
-        for(int col:colors){Button b=new Button(a);b.setText(" ");b.setBackgroundColor(col);b.setContentDescription(title);b.setOnClickListener(v->{holder[0]=col;if(refreshRef[0]!=null)refreshRef[0].run();Toast.makeText(a,title+" انتخاب شد",Toast.LENGTH_SHORT).show();});row.addView(b,new LinearLayout.LayoutParams(0,46,1));}box.addView(row,lp());
-    }
-    public static void styleDialog(AlertDialog d, Context c){
+    private static void addPalette(LinearLayout box,Activity a,String title,int[] holder,final Runnable[] refreshRef){TextView l=label(a,title);box.addView(l,lp());LinearLayout row=new LinearLayout(a);row.setOrientation(LinearLayout.HORIZONTAL);int[] colors={Color.WHITE,Color.BLACK,Color.rgb(8,127,91),Color.rgb(235,246,241),Color.rgb(35,45,40),Color.rgb(245,245,245),Color.rgb(30,90,150),Color.rgb(170,60,60),Color.rgb(220,170,50)};for(int col:colors){Button b=new Button(a);b.setText(" ");b.setBackgroundColor(col);b.setContentDescription(title);b.setOnClickListener(v->{holder[0]=col;if(refreshRef[0]!=null)refreshRef[0].run();Toast.makeText(a,title+" انتخاب شد",Toast.LENGTH_SHORT).show();});row.addView(b,new LinearLayout.LayoutParams(0,46,1));}box.addView(row,lp());}
+    public static void styleDialog(AlertDialog d,Context c){
         if(d==null)return;
-        d.setOnShowListener(x->{
-            Window w=d.getWindow();
-            if(w!=null){
-                GradientDrawable gd=new GradientDrawable();
-                gd.setColor(dark(c)?Color.rgb(32,32,32):Color.WHITE);
-                gd.setCornerRadius(dp(c,radius(c)));
-                gd.setStroke(dp(c,1),dark(c)?Color.rgb(80,100,90):Color.LTGRAY);
-                w.setBackgroundDrawable(gd);
-            }
-            int tc=text(c);
-            TextView title=d.findViewById(android.R.id.alertTitle);if(title!=null){title.setTextColor(tc);title.setTypeface(selectedTypeface(c,Typeface.BOLD));}
-            TextView msg=d.findViewById(android.R.id.message);if(msg!=null){msg.setTextColor(tc);msg.setTypeface(selectedTypeface(c,Typeface.NORMAL));}
-            Button p=d.getButton(AlertDialog.BUTTON_POSITIVE),n=d.getButton(AlertDialog.BUTTON_NEGATIVE),ne=d.getButton(AlertDialog.BUTTON_NEUTRAL);
-            if(p!=null){p.setTextColor(primary(c));p.setAllCaps(false);}
-            if(n!=null){n.setTextColor(textSecondary(c));n.setAllCaps(false);}
-            if(ne!=null){ne.setTextColor(textSecondary(c));ne.setAllCaps(false);}
+        d.setOnShowListener(x->{Window w=d.getWindow();if(w!=null){GradientDrawable gd=new GradientDrawable();gd.setColor(dark(c)?Color.rgb(32,32,32):Color.WHITE);gd.setCornerRadius(dp(c,radius(c)));gd.setStroke(dp(c,1),dark(c)?Color.rgb(80,100,90):Color.LTGRAY);w.setBackgroundDrawable(gd);}
+            int tc=text(c);TextView msg=d.findViewById(android.R.id.message);if(msg!=null){msg.setTextColor(tc);msg.setTypeface(selectedTypeface(c,Typeface.NORMAL));}
+            Button p=d.getButton(AlertDialog.BUTTON_POSITIVE),n=d.getButton(AlertDialog.BUTTON_NEGATIVE),ne=d.getButton(AlertDialog.BUTTON_NEUTRAL);if(p!=null){p.setTextColor(primary(c));p.setAllCaps(false);}if(n!=null){n.setTextColor(textSecondary(c));n.setAllCaps(false);}if(ne!=null){ne.setTextColor(textSecondary(c));ne.setAllCaps(false);}
         });
     }
-
-    public static void handleLogoResult(Activity a,int requestCode,int resultCode,Intent data){
-        if(requestCode!=PICK_LOGO_REQUEST||resultCode!=Activity.RESULT_OK||data==null||data.getData()==null)return;try{InputStream in=a.getContentResolver().openInputStream(data.getData());if(in==null)throw new IOException("Cannot open image");File f=new File(a.getFilesDir(),"company_logo.png");FileOutputStream out=new FileOutputStream(f);byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)out.write(buf,0,n);in.close();out.close();Toast.makeText(a,"لوگو با موفقیت انتخاب شد",Toast.LENGTH_SHORT).show();a.recreate();}catch(Exception e){Toast.makeText(a,"خطا در انتخاب لوگو",Toast.LENGTH_SHORT).show();}
-    }
+    public static void handleLogoResult(Activity a,int requestCode,int resultCode,Intent data){if(requestCode!=PICK_LOGO_REQUEST||resultCode!=Activity.RESULT_OK||data==null||data.getData()==null)return;try{InputStream in=a.getContentResolver().openInputStream(data.getData());if(in==null)throw new IOException("Cannot open image");File f=new File(a.getFilesDir(),"company_logo.png");FileOutputStream out=new FileOutputStream(f);byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)out.write(buf,0,n);in.close();out.close();Toast.makeText(a,"لوگو با موفقیت انتخاب شد",Toast.LENGTH_SHORT).show();a.recreate();}catch(Exception e){Toast.makeText(a,"خطا در انتخاب لوگو",Toast.LENGTH_SHORT).show();}}
     private static EditText edit(Activity a,String hint){EditText e=new EditText(a);e.setHint(hint);e.setSingleLine(true);e.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);styleText(a,e);return e;}
     private static Button button(Activity a,String s){Button b=new Button(a);b.setText(s);b.setAllCaps(false);styleText(a,b);return b;}
     private static TextView label(Activity a,String s){TextView t=new TextView(a);t.setText(s);styleText(a,t);return t;}
