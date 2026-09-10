@@ -117,11 +117,13 @@ public final class UiManager {
         if(d==null)return;
         d.setOnShowListener(x->{
             Window w=d.getWindow();
-            if(w!=null)GradientDrawable gd=new GradientDrawable();
-            gd.setColor(dark(c)?Color.rgb(32,32,32):Color.WHITE);
-            gd.setCornerRadius(dp(c,radius(c)));
-            gd.setStroke(dp(c,1),dark(c)?Color.rgb(80,100,90):Color.LTGRAY);
-            w.setBackgroundDrawable(gd);
+            if(w!=null){
+                GradientDrawable gd=new GradientDrawable();
+                gd.setColor(dark(c)?Color.rgb(32,32,32):Color.WHITE);
+                gd.setCornerRadius(dp(c,radius(c)));
+                gd.setStroke(dp(c,1),dark(c)?Color.rgb(80,100,90):Color.LTGRAY);
+                w.setBackgroundDrawable(gd);
+            }
             int tc=text(c);
             TextView title=d.findViewById(android.R.id.alertTitle);if(title!=null){title.setTextColor(tc);title.setTypeface(selectedTypeface(c,Typeface.BOLD));}
             TextView msg=d.findViewById(android.R.id.message);if(msg!=null){msg.setTextColor(tc);msg.setTypeface(selectedTypeface(c,Typeface.NORMAL));}
