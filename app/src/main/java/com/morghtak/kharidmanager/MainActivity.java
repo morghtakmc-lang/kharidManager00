@@ -255,9 +255,10 @@ public class MainActivity extends Activity {
         row.addView(cs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
         row.addView(as,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
         row.addView(fs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(row);
-        if(initialPurchaseStatus>=1&&initialPurchaseStatus<=4){
+        if(initialPurchaseStatus>=1&&initialPurchaseStatus<=6){
             if(initialPurchaseStatus<=2)cs.setSelection(initialPurchaseStatus);
-            else as.setSelection(initialPurchaseStatus-2);
+            else if(initialPurchaseStatus<=4)as.setSelection(initialPurchaseStatus-2);
+            else fs.setSelection(initialPurchaseStatus-4);
             initialPurchaseStatus=0;
         }
         Button go=btn("🔎 اعمال فیلتر");add(go);
@@ -396,12 +397,15 @@ public class MainActivity extends Activity {
         Runnable render=()->{list.removeAllViews();JSONArray b=AppData.arr(data,"buyers");String s=q.getText().toString().trim();for(int i=0;i<b.length();i++){String name=b.optString(i);if(!s.isEmpty()&&!name.contains(s))continue;Button x=btn("👤 "+name);x.setOnClickListener(v->openPage(()->buyerFile(name)));list.addView(x);}};go.setOnClickListener(v->render.run());render.run();Button addb=btn("➕ افزودن خریدار");addb.setOnClickListener(v->addEntry("buyers","خریدار جدید",this::buyersPage));add(addb);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("خریداران");
     }
     void buyerFile(String buyer){
-        base("پرونده خریدار: "+buyer);JSONArray a=AppData.arr(data,"purchases");int n=0,coll=0,alloc=0;long total=0,colAmt=0;ArrayList<JSONObject> noColl=new ArrayList<>(),noAlloc=new ArrayList<>();
-        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||!buyer.equals(p.optString("buyer")))continue;n++;long amt=toLong(p.optString("amount"));total+=amt;if(p.optBoolean("collected")){coll++;colAmt+=amt;}else noColl.add(p);if(p.optBoolean("allocated"))alloc++;else noAlloc.add(p);}
-        add(tv("آمار کل\nتعداد خرید: "+n+"\nمجموع مبلغ: "+AppData.fmt(""+total)+" ریال\nوصول‌شده: "+coll+" خرید، "+AppData.fmt(""+colAmt)+" ریال\nوصول‌نشده: "+(n-coll)+" خرید\nتخصیص‌شده: "+alloc+" خرید\nتخصیص‌نشده: "+(n-alloc)+" خرید",15));
-        add(tv("شماره‌های وصول‌نشده",15));addPurchaseNumberList(noColl);add(tv("شماره‌های تخصیص‌نشده",15));addPurchaseNumberList(noAlloc);
-        add(tv("فیلتر سریع خریدهای این خریدار",16));Button all=btn("همه خریدها"),c1=btn("وصول شده"),c2=btn("وصول نشده"),c3=btn("تخصیص شده"),c4=btn("تخصیص نشده");add(all);add(c1);add(c2);add(c3);add(c4);
-        all.setOnClickListener(v->openPage(()->listPurchases(buyer)));c1.setOnClickListener(v->openPage(()->listPurchasesWithStatus(buyer,1)));c2.setOnClickListener(v->openPage(()->listPurchasesWithStatus(buyer,2)));c3.setOnClickListener(v->openPage(()->listPurchasesWithStatus(buyer,3)));c4.setOnClickListener(v->openPage(()->listPurchasesWithStatus(buyer,4)));
+        base("پرونده خریدار: "+buyer);JSONArray a=AppData.arr(data,"purchases");int n=0,coll=0,alloc=0,full=0;long total=0,colAmt=0,fundedAmt=0,unfundedAmt=0;ArrayList<JSONObject> noColl=new ArrayList<>(),noAlloc=new ArrayList<>(),noFund=new ArrayList<>();
+        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||!buyer.equals(p.optString("buyer")))continue;n++;long amt=toLong(p.optString("amount"));total+=amt;long pf=totalFunded(p),rem=fundingRemaining(p);fundedAmt+=pf;unfundedAmt+=rem;if(p.optBoolean("collected")){coll++;colAmt+=amt;}else noColl.add(p);if(p.optBoolean("allocated"))alloc++;else noAlloc.add(p);if(rem<=0)full++;else noFund.add(p);}
+        add(tv("آمار کل\nتعداد خرید: "+n+"\nمجموع مبلغ: "+AppData.fmt(""+total)+" ریال\nوصول‌شده: "+coll+" خرید، "+AppData.fmt(""+colAmt)+" ریال\nوصول‌نشده: "+(n-coll)+" خرید\nتخصیص‌شده: "+alloc+" خرید\nتخصیص‌نشده: "+(n-alloc)+" خرید\nتأمین کامل: "+full+" خرید\nتأمین ناقص: "+(n-full)+" خرید\nمجموع تأمین‌شده: "+AppData.fmt(""+fundedAmt)+" ریال\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfundedAmt)+" ریال",15));
+        add(tv("شماره‌های وصول‌نشده",15));addPurchaseNumberList(noColl);add(tv("شماره‌های تخصیص‌نشده",15));addPurchaseNumberList(noAlloc);add(tv("شماره‌های تأمین ناقص",15));addPurchaseNumberList(noFund);
+        add(tv("فیلتر سریع خریدهای این خریدار",16));
+        LinearLayout filterRow=new LinearLayout(this);
+        Spinner cs=spinner(new String[]{"وصول: همه","وصول شده","وصول نشده"});Spinner as=spinner(new String[]{"تخصیص: همه","تخصیص شده","تخصیص نشده"});Spinner fs=spinner(new String[]{"تأمین: همه","تأمین کامل","تأمین ناقص"});
+        filterRow.addView(cs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));filterRow.addView(as,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));filterRow.addView(fs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(filterRow);
+        Button apply=btn("🔎 نمایش خریدهای فیلترشده");apply.setOnClickListener(v->{int st=0;if(cs.getSelectedItemPosition()==1)st=1;else if(cs.getSelectedItemPosition()==2)st=2;if(as.getSelectedItemPosition()==1)st=3;else if(as.getSelectedItemPosition()==2)st=4;if(fs.getSelectedItemPosition()==1)st=5;else if(fs.getSelectedItemPosition()==2)st=6;initialPurchaseStatus=st;openPage(()->listPurchases(buyer));});add(apply);
         Button stat=btn("📊 آمار بازه زمانی");stat.setOnClickListener(v->buyerStats(buyer));add(stat);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده خریدار");
     }
     void addPurchaseNumberList(ArrayList<JSONObject> items){if(items.isEmpty()){add(tv("ندارد",14));return;}for(JSONObject p:items){Button b=btn("📄 "+p.optString("purchaseNo"));b.setOnClickListener(v->openPage(()->details(p)));add(b);}}
