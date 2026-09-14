@@ -27,6 +27,7 @@ public class MainActivity extends Activity {
     final ArrayDeque<Runnable> history = new ArrayDeque<>();
     Runnable currentPage;
     int initialPurchaseStatus=0;
+    int initialCollectedFilter=0, initialAllocatedFilter=0, initialFundingFilter=0, initialQuotaFilter=0;
     JSONObject formOldPurchase;
     final String[] labels = {"نام واحد","گواهی بهداشتی","تعداد جوجه‌ریزی","سهمیه ذرت (کیلوگرم)","سهمیه سویا (کیلوگرم)","تاریخ جوجه‌ریزی","تاریخ اعتبار","نهاده","شماره خرید","وزن (کیلوگرم)","فی (ریال)","نوع پرداخت","مبلغ خرید (ریال)","تاریخ خرید","مقدار ذرت (کیلوگرم)","مقدار سویا (کیلوگرم)","مقدار ریزمغذی (کیلوگرم)","نام شرکت","تاریخ سررسید"};
     final String[] keys = {"unit","healthCertificate","chickCount","cornQuota","soyQuota","placementDate","quotaExpiry","commodity","purchaseNo","weight","fee","payment","amount","buyDate","corn","soy","micronutrient","company","mainDue"};
@@ -144,7 +145,7 @@ public class MainActivity extends Activity {
         inputs.get(12).setFocusable(false);inputs.get(12).setClickable(false);
         inputs.get(3).setFocusable(false);inputs.get(4).setFocusable(false);inputs.get(6).setFocusable(false);
 
-        TextWatcher calcW=new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){ }public void afterTextChanged(Editable e){calcPurchaseComposition();validateForm(null);}};
+        TextWatcher calcW=new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){ }public void afterTextChanged(Editable e){calcPurchaseComposition();calcAmount();validateForm(null);}};
         inputs.get(2).addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){updateQuotaFields();validateForm(null);}public void afterTextChanged(Editable e){}});
         inputs.get(5).addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){updateQuotaFields();validateForm(null);}public void afterTextChanged(Editable e){}});
         inputs.get(9).addTextChangedListener(calcW);inputs.get(10).addTextChangedListener(calcW);
@@ -210,7 +211,15 @@ public class MainActivity extends Activity {
     String certificateKey(){String u=unitSp==null?"":String.valueOf(unitSp.getSelectedItem());String c=inputs.size()>1?inputs.get(1).getText().toString().trim():"";return u+"|"+c;}
     JSONObject certificateBase(String key,JSONObject exclude){JSONArray a=AppData.arr(data,"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||p==exclude)continue;String k=p.optString("unit",p.optString("buyer"))+"|"+p.optString("healthCertificate");if(k.equals(key)&&!p.optString("healthCertificate").isEmpty())return p;}return null;}
     double quotaOriginal(JSONObject p,String key){try{return p==null?0:Double.parseDouble(p.optString(key,"0").replace(",",""));}catch(Exception e){return 0;}}
-    double usedQuota(String key,String unit,String cert,JSONObject exclude){double s=0;JSONArray a=AppData.arr(data,"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||p==exclude)continue;if(!unit.equals(p.optString("unit",p.optString("buyer")))||!cert.equals(p.optString("healthCertificate")))continue;s+=quotaOriginal(p,key);}return s;}
+    double usedQuota(String key,String unit,String cert,JSONObject exclude){
+        double s=0;JSONArray a=AppData.arr(data,"purchases");
+        String consumeKey="cornQuota".equals(key)?"corn":"soyQuota".equals(key)?"soy":key;
+        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||p==exclude)continue;
+            if(!unit.equals(p.optString("unit",p.optString("buyer")))||!cert.equals(p.optString("healthCertificate")))continue;
+            s+=toDouble(p.optString(consumeKey));
+        }
+        return s;
+    }
     double usedCorn(String unit,String cert,JSONObject exclude){double s=0;JSONArray a=AppData.arr(data,"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||p==exclude)continue;if(unit.equals(p.optString("unit",p.optString("buyer")))&&cert.equals(p.optString("healthCertificate")))s+=toDouble(p.optString("corn"));}return s;}
     double usedSoy(String unit,String cert,JSONObject exclude){double s=0;JSONArray a=AppData.arr(data,"purchases");for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||p==exclude)continue;if(unit.equals(p.optString("unit",p.optString("buyer")))&&cert.equals(p.optString("healthCertificate")))s+=toDouble(p.optString("soy"));}return s;}
     double toDouble(String s){try{return Double.parseDouble(AppData.digits(s).replace(",",""));}catch(Exception e){try{return Double.parseDouble(s.replace(",",""));}catch(Exception x){return 0;}}}
@@ -260,7 +269,7 @@ public class MainActivity extends Activity {
 
     void listPurchases(String fixedBuyer){
         base(fixedBuyer==null?"خریدهای ثبت‌شده":"پرونده "+fixedBuyer);
-        EditText q=input("جستجو: نام، شماره خرید، شرکت یا نهاده");
+        EditText q=input("جستجو: نام واحد، گواهی، شماره خرید، شرکت یا نهاده");
         LinearLayout dates=new LinearLayout(this);
         EditText from=new EditText(this),to=new EditText(this);
         from.setHint("از تاریخ");to.setHint("تا تاریخ");from.setSingleLine(true);to.setSingleLine(true);
@@ -268,53 +277,99 @@ public class MainActivity extends Activity {
         dates.addView(from,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
         dates.addView(to,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(dates);
 
-        LinearLayout row=new LinearLayout(this);
+        LinearLayout row1=new LinearLayout(this),row2=new LinearLayout(this);
+        row1.setOrientation(LinearLayout.HORIZONTAL);row2.setOrientation(LinearLayout.HORIZONTAL);
         Spinner cs=spinner(new String[]{"وصول: همه","وصول شده","وصول نشده"});
         Spinner as=spinner(new String[]{"تخصیص: همه","تخصیص شده","تخصیص نشده"});
         Spinner fs=spinner(new String[]{"تأمین: همه","تأمین کامل","تأمین ناقص"});
-        row.addView(cs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
-        row.addView(as,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
-        row.addView(fs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(row);
-        if(initialPurchaseStatus>=1&&initialPurchaseStatus<=6){
-            if(initialPurchaseStatus<=2)cs.setSelection(initialPurchaseStatus);
-            else if(initialPurchaseStatus<=4)as.setSelection(initialPurchaseStatus-2);
-            else fs.setSelection(initialPurchaseStatus-4);
-            initialPurchaseStatus=0;
-        }
+        Spinner qs=spinner(new String[]{"سهمیه: همه","سهمیه کامل","سهمیه مانده"});
+        row1.addView(cs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        row1.addView(as,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        row2.addView(fs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        row2.addView(qs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        add(row1);add(row2);
+
+        if(initialCollectedFilter>=0&&initialCollectedFilter<=2)cs.setSelection(initialCollectedFilter);
+        if(initialAllocatedFilter>=0&&initialAllocatedFilter<=2)as.setSelection(initialAllocatedFilter);
+        if(initialFundingFilter>=0&&initialFundingFilter<=2)fs.setSelection(initialFundingFilter);
+        if(initialQuotaFilter>=0&&initialQuotaFilter<=2)qs.setSelection(initialQuotaFilter);
+        initialCollectedFilter=initialAllocatedFilter=initialFundingFilter=initialQuotaFilter=0;
+
         Button go=btn("🔎 اعمال فیلتر");add(go);
         TextView summary=tv("",14);add(summary);
         LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
 
         Runnable render=()->{
-            list.removeAllViews();int count=0,col=0,alloc=0,full=0;long amount=0,funded=0,unfunded=0;
-            JSONArray a=sortedPurchases();String search=q.getText().toString().trim(),f=from.getText().toString(),t=to.getText().toString();
+            list.removeAllViews();
+            int count=0,col=0,alloc=0,fullFund=0,fullQuota=0;
+            long amount=0,funded=0,unfunded=0;double totalQuota=0,remainingQuota=0;
+            HashSet<String> certificateKeys=new HashSet<>();
+            JSONArray a=sortedPurchases();
+            String search=q.getText().toString().trim(),f=from.getText().toString().trim(),t=to.getText().toString().trim();
+            ArrayList<JSONObject> shown=new ArrayList<>();
+
             for(int i=0;i<a.length();i++){
                 JSONObject p=a.optJSONObject(i);if(p==null)continue;
-                if(fixedBuyer!=null&&!fixedBuyer.equals(p.optString("unit",p.optString("buyer"))))continue;
-                boolean collected=p.optBoolean("collected"),allocated=p.optBoolean("allocated"),complete=fundingRemaining(p)<=0;
+                String unit=p.optString("unit",p.optString("buyer"));
+                if(fixedBuyer!=null&&!fixedBuyer.equals(unit))continue;
+
+                boolean collected=p.optBoolean("collected"),allocated=p.optBoolean("allocated");
+                boolean fundComplete=fundingRemaining(p)<=0;
+                String cert=p.optString("healthCertificate").trim();
+                JSONObject certBase=cert.isEmpty()?null:certificateBase(unit+"|"+cert,null);
+                boolean hasQuota=certBase!=null&&quotaOriginal(certBase,"cornQuota")>0&&quotaOriginal(certBase,"soyQuota")>0;
+                boolean quotaComplete=hasQuota&&isCertificateComplete(unit,cert);
+
                 if(cs.getSelectedItemPosition()==1&&!collected)continue;
                 if(cs.getSelectedItemPosition()==2&&collected)continue;
                 if(as.getSelectedItemPosition()==1&&!allocated)continue;
                 if(as.getSelectedItemPosition()==2&&allocated)continue;
-                if(fs.getSelectedItemPosition()==1&&!complete)continue;
-                if(fs.getSelectedItemPosition()==2&&complete)continue;
-                String blob=p.optString("unit",p.optString("buyer"))+" "+p.optString("healthCertificate")+" "+p.optString("purchaseNo")+" "+p.optString("company")+" "+p.optString("commodity");
+                if(fs.getSelectedItemPosition()==1&&!fundComplete)continue;
+                if(fs.getSelectedItemPosition()==2&&fundComplete)continue;
+                if(qs.getSelectedItemPosition()==1&&(!hasQuota||!quotaComplete))continue;
+                if(qs.getSelectedItemPosition()==2&&(!hasQuota||quotaComplete))continue;
+
+                String blob=unit+" "+cert+" "+p.optString("purchaseNo")+" "+p.optString("company")+" "+p.optString("commodity");
                 if(!search.isEmpty()&&!blob.contains(search))continue;
-                if(!f.isEmpty()&&p.optString("buyDate").compareTo(f)<0)continue;
-                if(!t.isEmpty()&&p.optString("buyDate").compareTo(t)>0)continue;
-                count++;amount+=toLong(p.optString("amount"));long pf=totalFunded(p);funded+=pf;unfunded+=fundingRemaining(p);
-                if(collected)col++;if(allocated)alloc++;if(complete)full++;
-                Button item=btn("🏠 "+p.optString("unit",p.optString("buyer"))+" | خرید "+p.optString("purchaseNo")+
-                        "\nتاریخ: "+p.optString("buyDate")+
+                if(!f.isEmpty()&&!p.optString("buyDate").isEmpty()&&p.optString("buyDate").compareTo(f)<0)continue;
+                if(!t.isEmpty()&&!p.optString("buyDate").isEmpty()&&p.optString("buyDate").compareTo(t)>0)continue;
+
+                shown.add(p);count++;amount+=toLong(p.optString("amount"));
+                long pf=totalFunded(p);funded+=pf;unfunded+=fundingRemaining(p);
+                if(collected){col++;} if(allocated)alloc++; if(fundComplete)fullFund++;
+                if(quotaComplete)fullQuota++;
+
+                if(!cert.isEmpty()){
+                    String ck=unit+"|"+cert;
+                    if(certificateKeys.add(ck)){
+                        JSONObject baseCert=certificateBase(ck,null);
+                        if(baseCert!=null){
+                            double cq=quotaOriginal(baseCert,"cornQuota"),sq=quotaOriginal(baseCert,"soyQuota");
+                            double remC=Math.max(0,cq-usedCorn(unit,cert,null));
+                            double remS=Math.max(0,sq-usedSoy(unit,cert,null));
+                            totalQuota+=cq+sq;
+                            remainingQuota+=remC+remS;
+                        }
+                    }
+                }
+
+                Button item=btn("🏠 "+unit+" | خرید "+p.optString("purchaseNo")+
+                        "\nگواهی: "+(cert.isEmpty()?"-":cert)+
+                        " | تاریخ: "+p.optString("buyDate")+
                         "\n"+(collected?"وصول: وصول شده":"وصول: وصول نشده")+
                         " | "+(allocated?"تخصیص: تخصیص شده":"تخصیص: تخصیص نشده")+
-                        " | "+(complete?"تأمین: کامل":"تأمین: ناقص"));
+                        " | "+(fundComplete?"تأمین: کامل":"تأمین: ناقص")+
+                        " | "+(quotaComplete?"سهمیه: کامل":"سهمیه: مانده"));
                 item.setOnClickListener(v->openPage(()->details(p)));list.addView(item);
             }
+
             summary.setText("خلاصه نتایج نمایش‌داده‌شده\nتعداد: "+count+
-                    " | مبلغ: "+AppData.fmt(""+amount)+" ریال\nوصول: "+col+
-                    " | تخصیص: "+alloc+" | تأمین کامل: "+full+
-                    "\nمجموع تأمین‌شده: "+AppData.fmt(""+funded)+" ریال\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfunded)+" ریال");
+                    " | مبلغ: "+AppData.fmt(""+amount)+" ریال"+
+                    "\nوصول: "+col+" | تخصیص: "+alloc+" | تأمین کامل: "+fullFund+" | سهمیه کامل: "+fullQuota+
+                    "\nمجموع تأمین‌شده: "+AppData.fmt(""+funded)+" ریال"+
+                    "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfunded)+" ریال"+
+                    "\nمجموع سهمیه: "+fmtDecimal(totalQuota)+" کیلوگرم"+
+                    "\nسهمیه مانده: "+fmtDecimal(remainingQuota)+" کیلوگرم");
         };
         go.setOnClickListener(v->render.run());render.run();
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);
@@ -355,7 +410,7 @@ public class MainActivity extends Activity {
         Button remA=btn("🔕 حذف آلارم");remA.setOnClickListener(v->{try{p.put("alarm",false);AppData.save(this,data);cancelAlarm(this,p);details(p);}catch(Exception ignored){}});add(remA);
         Button ex=btn("📊 خروجی Excel همین خرید");ex.setOnClickListener(v->exportExcel(new JSONArray().put(p),"purchase_"+p.optString("purchaseNo")));add(ex);
         Button ed=btn("✏️ ویرایش");ed.setOnClickListener(v->openPage(()->form(p)));add(ed);
-        Button same=btn("🏠 پرونده "+p.optString("unit",p.optString("buyer")));same.setOnClickListener(v->openPage(()->listPurchases(p.optString("buyer"))));add(same);
+        Button same=btn("🏠 پرونده "+p.optString("unit",p.optString("buyer")));same.setOnClickListener(v->openPage(()->listPurchases(p.optString("unit",p.optString("buyer")))));add(same);
         Button del=btn("🗑 حذف");del.setOnClickListener(v->confirmDelete(p));add(del);
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);
         finishScreen("جزئیات کامل خرید");
@@ -418,24 +473,201 @@ public class MainActivity extends Activity {
         Runnable render=()->{list.removeAllViews();JSONArray b=AppData.arr(data,"units");String s=q.getText().toString().trim();for(int i=0;i<b.length();i++){String name=b.optString(i);if(!s.isEmpty()&&!name.contains(s))continue;Button x=btn("🏠 "+name);x.setOnClickListener(v->openPage(()->buyerFile(name)));list.addView(x);}};go.setOnClickListener(v->render.run());render.run();Button addb=btn("➕ افزودن واحد");addb.setOnClickListener(v->addEntry("units","واحد جدید",this::buyersPage));add(addb);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("واحدها");
     }
     void buyerFile(String buyer){
-        base("پرونده واحد: "+buyer);JSONArray a=AppData.arr(data,"purchases");int n=0,coll=0,alloc=0,full=0;long total=0,colAmt=0,fundedAmt=0,unfundedAmt=0;ArrayList<JSONObject> noColl=new ArrayList<>(),noAlloc=new ArrayList<>(),noFund=new ArrayList<>();
-        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||!buyer.equals(p.optString("unit",p.optString("buyer"))))continue;n++;long amt=toLong(p.optString("amount"));total+=amt;long pf=totalFunded(p),rem=fundingRemaining(p);fundedAmt+=pf;unfundedAmt+=rem;if(p.optBoolean("collected")){coll++;colAmt+=amt;}else noColl.add(p);if(p.optBoolean("allocated"))alloc++;else noAlloc.add(p);if(rem<=0)full++;else noFund.add(p);}
-        add(tv("آمار کل\nتعداد خرید: "+n+"\nمجموع مبلغ: "+AppData.fmt(""+total)+" ریال\nوصول‌شده: "+coll+" خرید، "+AppData.fmt(""+colAmt)+" ریال\nوصول‌نشده: "+(n-coll)+" خرید\nتخصیص‌شده: "+alloc+" خرید\nتخصیص‌نشده: "+(n-alloc)+" خرید\nتأمین کامل: "+full+" خرید\nتأمین ناقص: "+(n-full)+" خرید\nمجموع تأمین‌شده: "+AppData.fmt(""+fundedAmt)+" ریال\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfundedAmt)+" ریال",15));
-        add(tv("شماره‌های وصول‌نشده",15));addPurchaseNumberList(noColl);add(tv("شماره‌های تخصیص‌نشده",15));addPurchaseNumberList(noAlloc);add(tv("شماره‌های تأمین ناقص",15));addPurchaseNumberList(noFund);
+        base("پرونده واحد: "+buyer);
+        JSONArray a=AppData.arr(data,"purchases");
+        int n=0,coll=0,alloc=0,fullFund=0,fullQuota=0;
+        long total=0,colAmt=0,fundedAmt=0,unfundedAmt=0;double totalQuota=0,remainingQuota=0;
+        ArrayList<JSONObject> noColl=new ArrayList<>(),noAlloc=new ArrayList<>(),noFund=new ArrayList<>();
+        HashSet<String> certKeys=new HashSet<>();
+        ArrayList<String> incompleteCerts=new ArrayList<>();
+
+        for(int i=0;i<a.length();i++){
+            JSONObject p=a.optJSONObject(i);if(p==null||!buyer.equals(p.optString("unit",p.optString("buyer"))))continue;
+            n++;long amt=toLong(p.optString("amount"));total+=amt;
+            long pf=totalFunded(p),rem=fundingRemaining(p);fundedAmt+=pf;unfundedAmt+=rem;
+            if(p.optBoolean("collected")){coll++;colAmt+=amt;}else noColl.add(p);
+            if(p.optBoolean("allocated"))alloc++;else noAlloc.add(p);
+            if(rem<=0)fullFund++;else noFund.add(p);
+
+            String cert=p.optString("healthCertificate").trim();
+            if(!cert.isEmpty()){
+                String ck=buyer+"|"+cert;
+                if(certKeys.add(ck)){
+                    JSONObject cb=certificateBase(ck,null);
+                    if(cb!=null){
+                        double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");
+                        double rc=Math.max(0,cq-usedCorn(buyer,cert,null));
+                        double rs=Math.max(0,sq-usedSoy(buyer,cert,null));
+                        totalQuota+=cq+sq;remainingQuota+=rc+rs;
+                        boolean complete=rc<=0.0001&&rs<=0.0001;
+                        if(complete)fullQuota++;else incompleteCerts.add(cert);
+                    }
+                }
+            }
+        }
+
+        add(tv("آمار کل\nتعداد خرید: "+n+
+                "\nمجموع مبلغ: "+AppData.fmt(""+total)+" ریال"+
+                "\nوصول‌شده: "+coll+" خرید، "+AppData.fmt(""+colAmt)+" ریال"+
+                "\nوصول‌نشده: "+(n-coll)+" خرید"+
+                "\nتخصیص‌شده: "+alloc+" خرید"+
+                "\nتخصیص‌نشده: "+(n-alloc)+" خرید"+
+                "\nتأمین کامل: "+fullFund+" خرید"+
+                "\nتأمین ناقص: "+(n-fullFund)+" خرید"+
+                "\nمجموع تأمین‌شده: "+AppData.fmt(""+fundedAmt)+" ریال"+
+                "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfundedAmt)+" ریال"+
+                "\nمجموع سهمیه: "+fmtDecimal(totalQuota)+" کیلوگرم"+
+                "\nسهمیه مانده: "+fmtDecimal(remainingQuota)+" کیلوگرم"+
+                "\nگواهی‌های کامل: "+fullQuota+" | گواهی‌های دارای مانده: "+incompleteCerts.size(),15));
+
+        add(tv("شماره‌های وصول‌نشده",15));addPurchaseNumberList(noColl);
+        add(tv("شماره‌های تخصیص‌نشده",15));addPurchaseNumberList(noAlloc);
+        add(tv("شماره‌های تأمین ناقص",15));addPurchaseNumberList(noFund);
+
+        add(tv("گواهی‌های بهداشتی دارای مانده سهمیه",15));
+        if(incompleteCerts.isEmpty())add(tv("ندارد",14));
+        else{
+            for(String cert:incompleteCerts){
+                JSONObject cb=certificateBase(buyer+"|"+cert,null);
+                double cq=cb==null?0:quotaOriginal(cb,"cornQuota"),sq=cb==null?0:quotaOriginal(cb,"soyQuota");
+                double rc=Math.max(0,cq-usedCorn(buyer,cert,null)),rs=Math.max(0,sq-usedSoy(buyer,cert,null));
+                Button cbn=btn("📁 گواهی بهداشتی "+cert+"\nمانده ذرت: "+fmtDecimal(rc)+" | مانده سویا: "+fmtDecimal(rs)+" کیلوگرم");
+                cbn.setOnClickListener(v->openPage(()->certificateFile(buyer,cert)));add(cbn);
+            }
+        }
+
+        Button certs=btn("📂 خرید بر اساس گواهی بهداشتی");
+        certs.setOnClickListener(v->openPage(()->certificateIndex(buyer)));add(certs);
+
         add(tv("فیلتر سریع خریدهای این واحد",16));
-        LinearLayout filterRow=new LinearLayout(this);
-        Spinner cs=spinner(new String[]{"وصول: همه","وصول شده","وصول نشده"});Spinner as=spinner(new String[]{"تخصیص: همه","تخصیص شده","تخصیص نشده"});Spinner fs=spinner(new String[]{"تأمین: همه","تأمین کامل","تأمین ناقص"});
-        filterRow.addView(cs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));filterRow.addView(as,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));filterRow.addView(fs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(filterRow);
-        Button apply=btn("🔎 نمایش خریدهای فیلترشده");apply.setOnClickListener(v->{int st=0;if(cs.getSelectedItemPosition()==1)st=1;else if(cs.getSelectedItemPosition()==2)st=2;if(as.getSelectedItemPosition()==1)st=3;else if(as.getSelectedItemPosition()==2)st=4;if(fs.getSelectedItemPosition()==1)st=5;else if(fs.getSelectedItemPosition()==2)st=6;initialPurchaseStatus=st;openPage(()->listPurchases(buyer));});add(apply);
-        Button stat=btn("📊 آمار بازه زمانی");stat.setOnClickListener(v->buyerStats(buyer));add(stat);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده واحد");
+        LinearLayout row1=new LinearLayout(this),row2=new LinearLayout(this);
+        row1.setOrientation(LinearLayout.HORIZONTAL);row2.setOrientation(LinearLayout.HORIZONTAL);
+        Spinner cs=spinner(new String[]{"وصول: همه","وصول شده","وصول نشده"});
+        Spinner as=spinner(new String[]{"تخصیص: همه","تخصیص شده","تخصیص نشده"});
+        Spinner fs=spinner(new String[]{"تأمین: همه","تأمین کامل","تأمین ناقص"});
+        Spinner qs=spinner(new String[]{"سهمیه: همه","سهمیه کامل","سهمیه مانده"});
+        row1.addView(cs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        row1.addView(as,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        row2.addView(fs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        row2.addView(qs,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+        add(row1);add(row2);
+
+        Button apply=btn("🔎 نمایش خریدهای فیلترشده");
+        apply.setOnClickListener(v->{
+            initialCollectedFilter=cs.getSelectedItemPosition();
+            initialAllocatedFilter=as.getSelectedItemPosition();
+            initialFundingFilter=fs.getSelectedItemPosition();
+            initialQuotaFilter=qs.getSelectedItemPosition();
+            openPage(()->listPurchases(buyer));
+        });add(apply);
+
+        Button stat=btn("📊 آمار بازه زمانی");stat.setOnClickListener(v->buyerStats(buyer));add(stat);
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده واحد");
     }
-    void addPurchaseNumberList(ArrayList<JSONObject> items){if(items.isEmpty()){add(tv("ندارد",14));return;}for(JSONObject p:items){Button b=btn("📄 "+p.optString("purchaseNo"));b.setOnClickListener(v->openPage(()->details(p)));add(b);}}
-    void listPurchasesWithStatus(String buyer,int status){
-        initialPurchaseStatus=status;
-        listPurchases(buyer);
+
+    void certificateIndex(String unit){
+        base("خرید بر اساس گواهی بهداشتی: "+unit);
+        JSONArray a=AppData.arr(data,"purchases");LinkedHashMap<String,JSONObject> certs=new LinkedHashMap<>();
+        for(int i=0;i<a.length();i++){
+            JSONObject p=a.optJSONObject(i);if(p==null)continue;
+            if(!unit.equals(p.optString("unit",p.optString("buyer"))))continue;
+            String cert=p.optString("healthCertificate").trim();if(cert.isEmpty())continue;
+            if(!certs.containsKey(cert))certs.put(cert,p);
+        }
+        if(certs.isEmpty())add(tv("هنوز گواهی بهداشتی برای این واحد ثبت نشده است.",15));
+        for(String cert:certs.keySet()){
+            JSONObject cb=certs.get(cert);double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");
+            double uc=usedCorn(unit,cert,null),us=usedSoy(unit,cert,null);
+            double rc=Math.max(0,cq-uc),rs=Math.max(0,sq-us);
+            Button b=btn("📁 گواهی "+cert+
+                    "\nسهمیه ذرت: "+fmtDecimal(cq)+" | مانده: "+fmtDecimal(rc)+
+                    "\nسهمیه سویا: "+fmtDecimal(sq)+" | مانده: "+fmtDecimal(rs)+
+                    "\n"+((rc<=0.0001&&rs<=0.0001)?"✅ تکمیل شده":"⏳ مانده دارد"));
+            b.setOnClickListener(v->openPage(()->certificateFile(unit,cert)));add(b);
+        }
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("خرید بر اساس گواهی بهداشتی");
     }
-    void buyerStats(String buyer){base("آمار بازه‌ای: "+buyer);EditText f=input("از تاریخ");EditText t=input("تا تاریخ");f.setOnClickListener(v->pickDate(f));t.setOnClickListener(v->pickDate(t));Button b=btn("نمایش آمار");add(b);TextView out=tv("",15);add(out);b.setOnClickListener(v->{int n=0,c=0,a=0;long total=0;JSONArray p=AppData.arr(data,"purchases");for(int i=0;i<p.length();i++){JSONObject x=p.optJSONObject(i);if(x==null||!buyer.equals(x.optString("unit",x.optString("buyer"))))continue;String d=x.optString("buyDate");if(!f.getText().toString().isEmpty()&&d.compareTo(f.getText().toString())<0)continue;if(!t.getText().toString().isEmpty()&&d.compareTo(t.getText().toString())>0)continue;n++;total+=toLong(x.optString("amount"));if(x.optBoolean("collected"))c++;if(x.optBoolean("allocated"))a++;}out.setText("تعداد خرید: "+n+"\nمجموع مبلغ: "+AppData.fmt(""+total)+" ریال\nوصول‌شده: "+c+"\nتخصیص‌شده: "+a);});Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("آمار");}
+
+    void certificateFile(String unit,String cert){
+        base("گواهی بهداشتی: "+cert);
+        JSONObject cb=certificateBase(unit+"|"+cert,null);
+        if(cb==null){add(tv("پرونده این گواهی پیدا نشد.",15));Button b=btn("← بازگشت");b.setOnClickListener(v->back());add(b);finishScreen("پرونده گواهی");return;}
+        double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");
+        double uc=usedCorn(unit,cert,null),us=usedSoy(unit,cert,null);
+        double rc=Math.max(0,cq-uc),rs=Math.max(0,sq-us);
+        add(tv("اطلاعات گواهی\nشماره گواهی: "+cert+
+                "\nتعداد جوجه‌ریزی: "+cb.optString("chickCount")+
+                "\nتاریخ جوجه‌ریزی: "+cb.optString("placementDate")+
+                "\nتاریخ اعتبار: "+cb.optString("quotaExpiry"),15));
+        add(tv("وضعیت سهمیه\nذرت — اولیه: "+fmtDecimal(cq)+" | مصرف‌شده: "+fmtDecimal(uc)+" | مانده: "+fmtDecimal(rc)+
+                "\nسویا — اولیه: "+fmtDecimal(sq)+" | مصرف‌شده: "+fmtDecimal(us)+" | مانده: "+fmtDecimal(rs)+
+                "\n"+(rc<=0.0001&&rs<=0.0001?"✅ تکمیل خرید سهمیه":"⏳ سهمیه هنوز تکمیل نشده است"),15));
+
+        add(tv("خریدهای انجام‌شده با این گواهی",16));
+        JSONArray a=sortedPurchases();int count=0;
+        for(int i=0;i<a.length();i++){
+            JSONObject p=a.optJSONObject(i);if(p==null)continue;
+            if(!unit.equals(p.optString("unit",p.optString("buyer"))))continue;
+            if(!cert.equals(p.optString("healthCertificate").trim()))continue;
+            count++;
+            Button b=btn("📄 خرید "+p.optString("purchaseNo")+
+                    "\nتاریخ: "+p.optString("buyDate")+
+                    " | وزن: "+p.optString("weight")+" کیلوگرم"+
+                    "\nذرت مصرفی: "+p.optString("corn")+" | سویا مصرفی: "+p.optString("soy"));
+            b.setOnClickListener(v->openPage(()->details(p)));add(b);
+        }
+        if(count==0)add(tv("خریدی ثبت نشده است.",14));
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده گواهی");
+    }
+
     long toLong(String s){try{return Long.parseLong(AppData.digits(s));}catch(Exception e){return 0;}}
+
+    void buyerStats(String buyer){
+        base("آمار بازه‌ای: "+buyer);
+        EditText f=input("از تاریخ"),t=input("تا تاریخ");
+        f.setOnClickListener(v->pickDate(f));t.setOnClickListener(v->pickDate(t));
+        Button b=btn("نمایش آمار");add(b);TextView out=tv("",15);add(out);
+        b.setOnClickListener(v->{
+            int n=0,c=0,a=0,ff=0,qf=0;long total=0,funded=0,unfunded=0;
+            double totalQuota=0,remainingQuota=0;
+            HashSet<String> certKeys=new HashSet<>();
+            JSONArray p=AppData.arr(data,"purchases");
+            for(int i=0;i<p.length();i++){
+                JSONObject x=p.optJSONObject(i);if(x==null||!buyer.equals(x.optString("unit",x.optString("buyer"))))continue;
+                String d=x.optString("buyDate");
+                if(!f.getText().toString().isEmpty()&&d.compareTo(f.getText().toString())<0)continue;
+                if(!t.getText().toString().isEmpty()&&d.compareTo(t.getText().toString())>0)continue;
+                n++;total+=toLong(x.optString("amount"));
+                if(x.optBoolean("collected"))c++;
+                if(x.optBoolean("allocated"))a++;
+                long rem=fundingRemaining(x);funded+=totalFunded(x);unfunded+=rem;if(rem<=0)ff++;
+                String cert=x.optString("healthCertificate").trim();
+                if(!cert.isEmpty()){
+                    String ck=buyer+"|"+cert;
+                    if(certKeys.add(ck)){
+                        JSONObject cb=certificateBase(ck,null);
+                        if(cb!=null){
+                            double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");
+                            totalQuota+=cq+sq;
+                            remainingQuota+=Math.max(0,cq-usedCorn(buyer,cert,null))+Math.max(0,sq-usedSoy(buyer,cert,null));
+                            if(isCertificateComplete(buyer,cert))qf++;
+                        }
+                    }
+                }
+            }
+            out.setText("تعداد خرید: "+n+
+                    "\nمجموع مبلغ: "+AppData.fmt(""+total)+" ریال"+
+                    "\nوصول: "+c+" خرید"+
+                    "\nتخصیص: "+a+" خرید"+
+                    "\nتأمین: "+ff+" خرید کامل"+
+                    "\nسهمیه: "+qf+" گواهی کامل"+
+                    "\nمجموع تأمین‌شده: "+AppData.fmt(""+funded)+" ریال"+
+                    "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfunded)+" ریال"+
+                    "\nمجموع سهمیه: "+fmtDecimal(totalQuota)+" کیلوگرم"+
+                    "\nسهمیه مانده: "+fmtDecimal(remainingQuota)+" کیلوگرم");
+        });
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("آمار");
+    }
 
     void deadlines(){
         base("سررسیدها");add(tv("حالت نمایش",16));Spinner mode=spinner(new String[]{"نزدیک‌ترین سررسیدها","بازه تاریخی"});add(mode);
@@ -521,7 +753,7 @@ public class MainActivity extends Activity {
 
     void reports(){
         base("گزارش‌ها و خروجی Excel");EditText q=input("جستجوی خریدار، شرکت یا شماره خرید");Button b=btn("🔎 جستجو");add(b);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
-        Runnable render=()->{list.removeAllViews();String s=q.getText().toString().trim();TreeSet<String> buyers=new TreeSet<>(),companies=new TreeSet<>();JSONArray a=sortedPurchases();for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);String blob=p.optString("buyer")+" "+p.optString("company")+" "+p.optString("purchaseNo");if(s.isEmpty()||blob.contains(s)){buyers.add(p.optString("buyer"));companies.add(p.optString("company"));}}for(String x:buyers){Button z=btn("👤 "+x);z.setOnClickListener(vv->openPage(()->reportSelection("خریدار: "+x,"buyer",x)));list.addView(z);}for(String x:companies){Button z=btn("🏢 "+x);z.setOnClickListener(vv->openPage(()->reportSelection("شرکت: "+x,"company",x)));list.addView(z);}};
+        Runnable render=()->{list.removeAllViews();String s=q.getText().toString().trim();TreeSet<String> buyers=new TreeSet<>(),companies=new TreeSet<>();JSONArray a=sortedPurchases();for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);String blob=p.optString("unit",p.optString("buyer"))+" "+p.optString("company")+" "+p.optString("purchaseNo");if(s.isEmpty()||blob.contains(s)){buyers.add(p.optString("buyer"));companies.add(p.optString("company"));}}for(String x:buyers){Button z=btn("👤 "+x);z.setOnClickListener(vv->openPage(()->reportSelection("خریدار: "+x,"buyer",x)));list.addView(z);}for(String x:companies){Button z=btn("🏢 "+x);z.setOnClickListener(vv->openPage(()->reportSelection("شرکت: "+x,"company",x)));list.addView(z);}};
         b.setOnClickListener(v->render.run());render.run();add(tv("ابتدا خریدار یا شرکت را انتخاب کنید؛ سپس خریدها را تیک بزنید و خروجی بگیرید.",13));Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("گزارش‌ها و خروجی Excel");
     }
     void reportSelection(String title,String filterKey,String filterVal){
@@ -538,13 +770,13 @@ public class MainActivity extends Activity {
     String safe(String s){return s.replaceAll("[\\\\/:*?\"<>|]","_");}
     void exportExcel(JSONArray a,String name){
         try{
-            String[] h={"نام واحد","گواهی بهداشتی","تعداد جوجه‌ریزی","سهمیه ذرت","سهمیه سویا","تاریخ جوجه‌ریزی","تاریخ اعتبار","نهاده","شماره خرید","وزن","فی","نوع پرداخت","مبلغ خرید","تاریخ خرید","ذرت","سویا","ریزمغذی","نام شرکت","تاریخ سررسید","وصول","تاریخ وصول","تخصیص","تأمین‌شده","باقی‌مانده","تعداد مراحل تأمین","جزئیات مراحل"};
+            String[] h={"نام واحد","گواهی بهداشتی","تعداد جوجه‌ریزی","سهمیه ذرت","سهمیه سویا","تاریخ جوجه‌ریزی","تاریخ اعتبار","نهاده","شماره خرید","وزن","فی","نوع پرداخت","مبلغ خرید","تاریخ خرید","ذرت","سویا","ریزمغذی","نام شرکت","تاریخ سررسید","وصول","تاریخ وصول","تخصیص","تأمین‌شده","باقی‌مانده","تعداد مراحل تأمین","جزئیات مراحل","مصرف تجمعی ذرت گواهی","مانده ذرت گواهی","مصرف تجمعی سویا گواهی","مانده سویا گواهی","وضعیت سهمیه"};
             StringBuilder x=new StringBuilder("\uFEFF");for(String z:h)x.append(z).append("\t");x.append("\n");
             for(int i=0;i<a.length();i++){
                 JSONObject p=a.optJSONObject(i);
                 String details="";JSONArray st=funding(p);
                 for(int j=0;j<st.length();j++){JSONObject q=st.optJSONObject(j);if(j>0)details+=" | ";details+="مرحله "+(j+1)+": "+q.optString("date")+" / "+q.optString("amount")+" / "+q.optString("source")+" -> "+q.optString("destination");}
-                String[] v={p.optString("unit",p.optString("buyer")),p.optString("healthCertificate"),p.optString("chickCount"),p.optString("cornQuota"),p.optString("soyQuota"),p.optString("placementDate"),p.optString("quotaExpiry"),p.optString("commodity"),p.optString("purchaseNo"),p.optString("weight"),p.optString("fee"),p.optString("payment"),p.optString("amount"),p.optString("buyDate"),p.optString("corn"),p.optString("soy"),p.optString("micronutrient"),p.optString("company"),p.optString("mainDue"),p.optBoolean("collected")?"وصول شده":"وصول نشده",p.optString("collectedDate"),p.optBoolean("allocated")?"تخصیص شده":"تخصیص نشده",String.valueOf(totalFunded(p)),String.valueOf(fundingRemaining(p)),String.valueOf(st.length()),details};
+                String unit=p.optString("unit",p.optString("buyer")),cert=p.optString("healthCertificate").trim();double uc=cert.isEmpty()?0:usedCorn(unit,cert,null),us=cert.isEmpty()?0:usedSoy(unit,cert,null),cq=cert.isEmpty()?0:quotaOriginal(certificateBase(unit+"|"+cert,null),"cornQuota"),sq=cert.isEmpty()?0:quotaOriginal(certificateBase(unit+"|"+cert,null),"soyQuota");String[] v={unit,cert,p.optString("chickCount"),p.optString("cornQuota"),p.optString("soyQuota"),p.optString("placementDate"),p.optString("quotaExpiry"),p.optString("commodity"),p.optString("purchaseNo"),p.optString("weight"),p.optString("fee"),p.optString("payment"),p.optString("amount"),p.optString("buyDate"),p.optString("corn"),p.optString("soy"),p.optString("micronutrient"),p.optString("company"),p.optString("mainDue"),p.optBoolean("collected")?"وصول شده":"وصول نشده",p.optString("collectedDate"),p.optBoolean("allocated")?"تخصیص شده":"تخصیص نشده",String.valueOf(totalFunded(p)),String.valueOf(fundingRemaining(p)),String.valueOf(st.length()),details,fmtDecimal(uc),fmtDecimal(Math.max(0,cq-uc)),fmtDecimal(us),fmtDecimal(Math.max(0,sq-us)),(cq>0&&sq>0&&cq-uc<=0.0001&&sq-us<=0.0001)?"تکمیل":"مانده"};
                 for(String z:v)x.append(xml(z)).append("\t");x.append("\n");
             }
             File f=new File(getCacheDir(),name+".xls");FileOutputStream o=new FileOutputStream(f);o.write(x.toString().getBytes("UTF-8"));o.close();
