@@ -622,6 +622,19 @@ public class MainActivity extends Activity {
 
     long toLong(String s){try{return Long.parseLong(AppData.digits(s));}catch(Exception e){return 0;}}
 
+    void addPurchaseNumberList(ArrayList<JSONObject> list){
+        if(list==null||list.isEmpty()){ add(tv("موردی وجود ندارد",14)); return; }
+        for(JSONObject obj:list){
+            if(obj==null) continue;
+            String no=obj.optString("purchaseNo","").trim();
+            if(!no.isEmpty()){
+                Button b=btn("• خرید "+no);
+                b.setOnClickListener(v->openPage(()->details(obj)));
+                add(b);
+            }
+        }
+    }
+
     void buyerStats(String buyer){
         base("آمار بازه‌ای: "+buyer);
         EditText f=input("از تاریخ"),t=input("تا تاریخ");
