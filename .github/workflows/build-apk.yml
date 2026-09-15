@@ -1,6 +1,5 @@
 ```yaml
-name: Build KharidManager APK
-
+name: Build KharidManager APK v2
 on:
   workflow_dispatch:
   push:
