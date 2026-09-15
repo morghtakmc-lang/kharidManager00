@@ -1,3 +1,4 @@
+```yaml
 name: Build KharidManager APK
 
 on:
@@ -24,6 +25,11 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platform-tools"
+          yes | sdkmanager --licenses
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -38,3 +44,4 @@ jobs:
           name: KharidManager-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+```
