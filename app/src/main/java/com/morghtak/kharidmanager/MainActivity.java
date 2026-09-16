@@ -476,7 +476,8 @@ public class MainActivity extends Activity {
         base("پرونده واحد: "+buyer);
         JSONArray a=AppData.arr(data,"purchases");
         int n=0,coll=0,alloc=0,fullFund=0,fullQuota=0;
-        long total=0,colAmt=0,fundedAmt=0,unfundedAmt=0;double totalQuota=0,remainingQuota=0;
+        long total=0,colAmt=0,fundedAmt=0,unfundedAmt=0;
+        double totalCornQuota=0,remainingCornQuota=0,totalSoyQuota=0,remainingSoyQuota=0;
         ArrayList<JSONObject> noColl=new ArrayList<>(),noAlloc=new ArrayList<>(),noFund=new ArrayList<>();
         HashSet<String> certKeys=new HashSet<>();
         ArrayList<String> incompleteCerts=new ArrayList<>();
@@ -498,7 +499,10 @@ public class MainActivity extends Activity {
                         double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");
                         double rc=Math.max(0,cq-usedCorn(buyer,cert,null));
                         double rs=Math.max(0,sq-usedSoy(buyer,cert,null));
-                        totalQuota+=cq+sq;remainingQuota+=rc+rs;
+                        totalCornQuota+=cq;
+                        remainingCornQuota+=rc;
+                        totalSoyQuota+=sq;
+                        remainingSoyQuota+=rs;
                         boolean complete=rc<=0.0001&&rs<=0.0001;
                         if(complete)fullQuota++;else incompleteCerts.add(cert);
                     }
@@ -516,8 +520,10 @@ public class MainActivity extends Activity {
                 "\nتأمین ناقص: "+(n-fullFund)+" خرید"+
                 "\nمجموع تأمین‌شده: "+AppData.fmt(""+fundedAmt)+" ریال"+
                 "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfundedAmt)+" ریال"+
-                "\nمجموع سهمیه: "+fmtDecimal(totalQuota)+" کیلوگرم"+
-                "\nسهمیه مانده: "+fmtDecimal(remainingQuota)+" کیلوگرم"+
+                "\nمجموع سهمیه سویا: "+fmtDecimal(totalSoyQuota)+" کیلوگرم"+
+                "\nمانده سهمیه سویا: "+fmtDecimal(remainingSoyQuota)+" کیلوگرم"+
+                "\nمجموع سهمیه ذرت: "+fmtDecimal(totalCornQuota)+" کیلوگرم"+
+                "\nمانده سهمیه ذرت: "+fmtDecimal(remainingCornQuota)+" کیلوگرم"+
                 "\nگواهی‌های کامل: "+fullQuota+" | گواهی‌های دارای مانده: "+incompleteCerts.size(),15));
 
         add(tv("شماره‌های وصول‌نشده",15));addPurchaseNumberList(noColl);
