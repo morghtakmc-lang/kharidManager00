@@ -23,7 +23,8 @@ public class MainActivity extends Activity {
     LinearLayout root;
     JSONObject data;
     ArrayList<EditText> inputs = new ArrayList<>();
-    Spinner unitSp, commoditySp, paymentSp, companySp;
+    Spinner unitSp, commoditySp, paymentSp, paymentDetailSp, companySp;
+    EditText cardDateInput;
     final ArrayDeque<Runnable> history = new ArrayDeque<>();
     Runnable currentPage;
     int initialPurchaseStatus=0;
@@ -56,7 +57,7 @@ public class MainActivity extends Activity {
             if(!data.has("destinationAccounts")){data.put("destinationAccounts",new JSONArray());changed=true;}
             JSONArray oldUnits=data.has("units")?data.optJSONArray("units"):null;
             if(oldUnits==null){oldUnits=new JSONArray();JSONArray oldBuyers=AppData.arr(data,"buyers");for(int i=0;i<oldBuyers.length();i++)oldUnits.put(oldBuyers.optString(i));data.put("units",oldUnits);changed=true;}
-            for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;if(!p.has("unit")&&p.has("buyer")){p.put("unit",p.optString("buyer"));changed=true;}if(!p.has("healthCertificate")){p.put("healthCertificate","");changed=true;}if(!p.has("chickCount")){p.put("chickCount","");changed=true;}if(!p.has("cornQuota")){p.put("cornQuota","");changed=true;}if(!p.has("soyQuota")){p.put("soyQuota","");changed=true;}if(!p.has("placementDate")){p.put("placementDate","");changed=true;}if(!p.has("quotaExpiry")){p.put("quotaExpiry","");changed=true;}}
+            for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;if(!p.has("unit")&&p.has("buyer")){p.put("unit",p.optString("buyer"));changed=true;}if(!p.has("healthCertificate")){p.put("healthCertificate","");changed=true;}if(!p.has("chickCount")){p.put("chickCount","");changed=true;}if(!p.has("cornQuota")){p.put("cornQuota","");changed=true;}if(!p.has("soyQuota")){p.put("soyQuota","");changed=true;}if(!p.has("placementDate")){p.put("placementDate","");changed=true;}if(!p.has("quotaExpiry")){p.put("quotaExpiry","");changed=true;}if(!p.has("cardRegistrationDate")){p.put("cardRegistrationDate","");changed=true;}if(!p.has("paymentDetail")){p.put("paymentDetail","");changed=true;}}
             if(changed)AppData.save(this,data);
         }catch(Exception ignored){}
     }
@@ -85,19 +86,24 @@ public class MainActivity extends Activity {
         history.clear(); base("مدیریت خرید و سررسید");
         TextView s=tv("",16); add(s);
         JSONArray a=AppData.arr(data,"purchases"); int open=0;
-        for(int i=0;i<a.length();i++)if(!a.optJSONObject(i).optBoolean("collected",false))open++;
+        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p!=null&&!p.optBoolean("collected",false))open++;}
         s.setText("تعداد خریدها: "+a.length()+"\nخریدهای در انتظار وصول: "+open);
         Button b=btn("➕ ثبت خرید جدید"); b.setOnClickListener(v->openPage(()->form(null))); add(b);
         b=btn("🛒 خریدهای ثبت‌شده"); b.setOnClickListener(v->openPage(()->listPurchases(null))); add(b);
         b=btn("🏠 واحدها"); b.setOnClickListener(v->openPage(this::buyersPage)); add(b);
+        b=btn("💳 تأمین موجودی"); b.setOnClickListener(v->openPage(this::incompleteFundingPage)); add(b);
+        b=btn("💰 وصول"); b.setOnClickListener(v->openPage(this::incompleteCollectionPage)); add(b);
+        b=btn("📦 تخصیص"); b.setOnClickListener(v->openPage(this::incompleteAllocationPage)); add(b);
         b=btn("🔔 سررسیدها"); b.setOnClickListener(v->openPage(this::deadlines)); add(b);
+        b=btn("📂 خرید بر اساس گواهی بهداشتی"); b.setOnClickListener(v->openPage(this::certificateHome)); add(b);
+        b=btn("🔄 انتقال مانده سهمیه به شاهدانه"); b.setOnClickListener(v->openPage(this::quotaTransferPlaceholder)); add(b);
         b=btn("🏢 شرکت‌ها"); b.setOnClickListener(v->openPage(()->manage("companies","شرکت‌ها"))); add(b);
         b=btn("🌾 نهاده‌ها"); b.setOnClickListener(v->openPage(()->manage("commodities","نهاده‌ها"))); add(b);
         b=btn("🏦 حساب‌ها"); b.setOnClickListener(v->openPage(this::accountsPage)); add(b);
-        b=btn("📊 گزارش‌ها و خروجی Excel"); b.setOnClickListener(v->openPage(this::reports)); add(b);
         b=btn("💾 پشتیبان‌گیری / بازیابی"); b.setOnClickListener(v->openPage(this::backup)); add(b);
         finishScreen("مدیریت خرید و سررسید");
     }
+
 
     void base(String title){
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
@@ -130,12 +136,27 @@ public class MainActivity extends Activity {
             label((i+1)+". "+labels[i]);
             if(i==0){unitSp=spinnerWithBlank(AppData.arr(data,"units"),"انتخاب واحد");add(unitSp);hidden();}
             else if(i==7){commoditySp=spinnerWithBlank(AppData.arr(data,"commodities"),"انتخاب نهاده");add(commoditySp);hidden();}
-            else if(i==11){paymentSp=spinnerWithBlank(AppData.PAYMENTS,"انتخاب نوع پرداخت");add(paymentSp);hidden();}
+            else if(i==11){
+                paymentSp=spinnerWithBlank(new String[]{"توافقی","نقد"},"انتخاب نوع پرداخت");add(paymentSp);hidden();
+                paymentDetailSp=spinnerWithBlank(new String[]{""},"انتخاب جزئیات پرداخت");paymentDetailSp.setVisibility(View.GONE);add(paymentDetailSp);
+            }
             else if(i==17){companySp=spinnerWithBlank(AppData.arr(data,"companies"),"انتخاب شرکت");add(companySp);hidden();}
             else{
                 EditText e=input("");
                 if(i==5)e.setOnClickListener(v->{pickDate(e);updateQuotaFields();});
-                if(i==6){e.setFocusable(false);e.setClickable(false);}
+                if(i==6){
+                    e.setFocusable(false);e.setClickable(false);
+                    label("تاریخ ثبت کارت");
+                    cardDateInput=new EditText(this);
+                    cardDateInput.setSingleLine(true);
+                    cardDateInput.setTextSize(UiManager.fieldSize(this));
+                    cardDateInput.setTextColor(UiManager.text(this));
+                    cardDateInput.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+                    cardDateInput.setPadding(UiManager.dp(this,14),UiManager.dp(this,8),UiManager.dp(this,14),UiManager.dp(this,8));
+                    cardDateInput.setBackground(fieldBg(true));
+                    cardDateInput.setOnClickListener(v->pickDate(cardDateInput));
+                    add(cardDateInput);
+                }
                 if(i==13||i==18)e.setOnClickListener(v->pickDate(e));
                 if(i==2||i==3||i==4||i==9||i==10||i==12||i==14||i==15||i==16){e.setInputType(2);addGrouping(e);}
                 if(i==3||i==4||i==6||i==12||i==14||i==15||i==16)e.setFocusable(false);
@@ -177,6 +198,18 @@ public class MainActivity extends Activity {
         updateAlarmStatus(preview,days.getText().toString(),time.getText().toString(),inputs.get(18).getText().toString());setupValidationListeners(save);validateForm(save);
     }
 
+    void updatePaymentDetailOptions(){
+        if(paymentSp==null||paymentDetailSp==null)return;
+        int pos=paymentSp.getSelectedItemPosition();
+        String current=paymentDetailSp.getSelectedItem()==null?"":String.valueOf(paymentDetailSp.getSelectedItem());
+        String[] opts=pos==1?new String[]{"نسیه","چک","پالیز","برات"}:pos==2?new String[]{"از بانک","واریز"}:new String[]{""};
+        ArrayList<String> x=new ArrayList<>();x.add("");Collections.addAll(x,opts);
+        ArrayAdapter<String> ad=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,x);
+        paymentDetailSp.setAdapter(ad);
+        paymentDetailSp.setVisibility(pos>0?View.VISIBLE:View.GONE);
+        if(!current.isEmpty())setSpinner(paymentDetailSp,current);
+    }
+
     Spinner spinnerWithBlank(JSONArray a,String placeholder){ArrayList<String>x=new ArrayList<>();x.add("");for(int i=0;i<a.length();i++)x.add(a.optString(i));return spinnerWithBlankArray(x.toArray(new String[0]));}
     Spinner spinnerWithBlank(String[] a,String placeholder){ArrayList<String>x=new ArrayList<>();x.add("");Collections.addAll(x,a);return spinnerWithBlankArray(x.toArray(new String[0]));}
     Spinner spinnerWithBlankArray(String[] x){Spinner s=new Spinner(this);ArrayAdapter<String> ad=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,x){@Override public View getView(int position,View convertView,android.view.ViewGroup parent){TextView v=(TextView)super.getView(position,convertView,parent);v.setText(position==0?"":String.valueOf(getItem(position)));return v;}};s.setAdapter(ad);return s;}
@@ -201,8 +234,16 @@ public class MainActivity extends Activity {
             else if(commodity.contains("پایانی 1")||commodity.contains("پایانی ۱")){c=w*640.0/1000.0;so=w*300.0/1000.0;mi=w-c-so;}
             else if(commodity.contains("پایانی 2")||commodity.contains("پایانی ۲")){c=w*650.0/1000.0;so=w*290.0/1000.0;mi=w-c-so;}
             else {setCalcInput(14,0);setCalcInput(15,0);setCalcInput(16,0);return;}
+            c=roundCompositionValue(c);so=roundCompositionValue(so);mi=w-c-so;
             setCalcInput(14,c);setCalcInput(15,so);setCalcInput(16,mi);
         }catch(Exception ignored){}
+    }
+    double roundCompositionValue(double v){
+        if(!Double.isFinite(v))return 0;
+        double whole=Math.floor(v),frac=v-whole;
+        if(frac>0.5)return whole+1;
+        if(frac<0.5)return whole;
+        return whole+1;
     }
     void setCalcInput(int idx,double value){String v=fmtDecimal(value);if(!v.equals(inputs.get(idx).getText().toString()))inputs.get(idx).setText(v);}
     String fmtDecimal(double v){if(Math.abs(v-Math.rint(v))<0.0000001)return AppData.fmt(String.valueOf((long)Math.rint(v)));return String.format(Locale.US,"%,.3f",v).replace(".000","");}
@@ -226,13 +267,14 @@ public class MainActivity extends Activity {
     String quotaStatusText(JSONObject old){String unit=unitSp==null?"":String.valueOf(unitSp.getSelectedItem()),cert=inputs.size()>1?inputs.get(1).getText().toString().trim():"";if(unit.trim().isEmpty()||cert.isEmpty())return "ابتدا واحد و شماره گواهی بهداشتی را مشخص کنید.";JSONObject base=certificateBase(unit+"|"+cert,old);double cq=base==null?toDouble(inputs.get(3).getText().toString()):quotaOriginal(base,"cornQuota"),sq=base==null?toDouble(inputs.get(4).getText().toString()):quotaOriginal(base,"soyQuota");double uc=usedCorn(unit,cert,old),us=usedSoy(unit,cert,old),cc=toDouble(inputs.get(14).getText().toString()),cs=toDouble(inputs.get(15).getText().toString());double rc=Math.max(0,cq-uc-cc),rs=Math.max(0,sq-us-cs);boolean full=rc<=0.0001&&rs<=0.0001;return "سهمیه اولیه ذرت: "+fmtDecimal(cq)+" کیلوگرم\nمانده سهمیه ذرت پس از این خرید: "+fmtDecimal(rc)+" کیلوگرم\nسهمیه اولیه سویا: "+fmtDecimal(sq)+" کیلوگرم\nمانده سهمیه سویا پس از این خرید: "+fmtDecimal(rs)+" کیلوگرم\n"+(full?"✅ تکمیل خرید سهمیه":"⏳ سهمیه هنوز تکمیل نشده است");}
 
     void setupValidationListeners(Button save){
-        AdapterView.OnItemSelectedListener l=new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int pos,long id){calcPurchaseComposition();validateForm(save);}};
+        AdapterView.OnItemSelectedListener l=new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int pos,long id){if(p==paymentSp)updatePaymentDetailOptions();calcPurchaseComposition();validateForm(save);}};
         if(unitSp!=null)unitSp.setOnItemSelectedListener(l);if(commoditySp!=null)commoditySp.setOnItemSelectedListener(l);if(paymentSp!=null)paymentSp.setOnItemSelectedListener(l);if(companySp!=null)companySp.setOnItemSelectedListener(l);
         for(int i:new int[]{1,2,5,8,9,10,13,18})inputs.get(i).addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){validateForm(save);}public void afterTextChanged(Editable e){}});
     }
     boolean validateForm(Button save){
         boolean ok=true;
         ok &= markSpinner(unitSp,unitSp!=null&&unitSp.getSelectedItemPosition()>0);ok &= markSpinner(commoditySp,commoditySp!=null&&commoditySp.getSelectedItemPosition()>0);ok &= markSpinner(paymentSp,paymentSp!=null&&paymentSp.getSelectedItemPosition()>0);ok &= markSpinner(companySp,companySp!=null&&companySp.getSelectedItemPosition()>0);
+        if(paymentDetailSp!=null&&paymentSp!=null&&paymentSp.getSelectedItemPosition()>0)ok &= markSpinner(paymentDetailSp,paymentDetailSp.getSelectedItemPosition()>0);
         int[] req={1,2,5,8,9,10,13,18};for(int i:req)ok &= markField(inputs.get(i),!inputs.get(i).getText().toString().trim().isEmpty());
         String cert=inputs.get(1).getText().toString().trim(),unit=unitSp==null?"":String.valueOf(unitSp.getSelectedItem());
         if(cert.isEmpty()||unit.trim().isEmpty())ok=false;
@@ -250,14 +292,28 @@ public class MainActivity extends Activity {
     void pickAlarmTime(EditText target){String value=target.getText().toString().trim();int hour=10,minute=0;try{String[] parts=value.split(":");if(parts.length==2){hour=Integer.parseInt(AppData.digits(parts[0]));minute=Integer.parseInt(AppData.digits(parts[1]));if(hour<0||hour>23)hour=10;if(minute<0||minute>59)minute=0;}}catch(Exception ignored){}TimePickerDialog dlg=new TimePickerDialog(this,(view,h,m)->target.setText(String.format(Locale.US,"%02d:%02d",h,m)),hour,minute,true);dlg.setTitle("انتخاب ساعت هشدار");dlg.show();}
     void updateAlarmStatus(TextView v,String days,String time,String due){String d=days.trim(),t=time.trim();if(d.isEmpty()&&t.isEmpty()){v.setText("هشدار تنظیم نشده است");return;}if(!d.matches("\\d+")||!t.matches("([01]\\d|2[0-3]):[0-5]\\d")||due.trim().isEmpty()){v.setText("⚠ تنظیم هشدار کامل نیست");return;}v.setText("🔔 هشدار فعال: "+due+" ، "+d+" روز قبل، ساعت "+t);}
     void calcAmount(){try{double w=toDouble(inputs.get(9).getText().toString()),f=toDouble(inputs.get(10).getText().toString());if(w<=0||f<=0){inputs.get(12).setText("");return;}double total=w*f;if(!Double.isFinite(total)||total>Long.MAX_VALUE){inputs.get(12).setText("");return;}inputs.get(12).setText(AppData.fmt(String.valueOf(Math.round(total))));}catch(Exception ignored){inputs.get(12).setText("");}}
-    void fill(JSONObject p){for(int i=0;i<keys.length;i++){if(i==0||i==7||i==11||i==17)continue;inputs.get(i).setText(p.optString(keys[i],""));}setSpinner(unitSp,p.optString("unit",p.optString("buyer")));setSpinner(commoditySp,p.optString("commodity"));setSpinner(paymentSp,p.optString("payment"));setSpinner(companySp,p.optString("company"));updateQuotaFields();calcPurchaseComposition();calcAmount();}
+    void fill(JSONObject p){
+        for(int i=0;i<keys.length;i++){if(i==0||i==7||i==11||i==17)continue;inputs.get(i).setText(p.optString(keys[i],""));}
+        setSpinner(unitSp,p.optString("unit",p.optString("buyer")));
+        setSpinner(commoditySp,p.optString("commodity"));
+        String pay=p.optString("payment",""),detail=p.optString("paymentDetail","");
+        if(pay.contains(" - ")){String[] pp=pay.split(" - ",2);pay=pp[0].trim();if(detail.isEmpty())detail=pp[1].trim();}
+        if("نسیه".equals(pay)){pay="توافقی";if(detail.isEmpty())detail="نسیه";}
+        setSpinner(paymentSp,pay);updatePaymentDetailOptions();setSpinner(paymentDetailSp,detail);
+        setSpinner(companySp,p.optString("company"));
+        if(cardDateInput!=null)cardDateInput.setText(p.optString("cardRegistrationDate",p.optString("cardDate","")));
+        updateQuotaFields();calcPurchaseComposition();calcAmount();
+    }
     void savePurchase(JSONObject old,String ds,String tm,boolean repeat,Button saveButton){
         if(!validateForm(saveButton)){Toast.makeText(this,"اطلاعات ناقص است، ترکیب خرید یا سهمیه مجاز نیست",Toast.LENGTH_LONG).show();return;}
         try{
             calcPurchaseComposition();String unit=String.valueOf(unitSp.getSelectedItem()).trim(),cert=inputs.get(1).getText().toString().trim();JSONObject base=certificateBase(unit+"|"+cert,old);
             if(base!=null){double cq=quotaOriginal(base,"cornQuota"),sq=quotaOriginal(base,"soyQuota");String oldChick=base.optString("chickCount"),oldDate=base.optString("placementDate");if(Math.abs(cq-toDouble(inputs.get(3).getText().toString()))>0.001||Math.abs(sq-toDouble(inputs.get(4).getText().toString()))>0.001||(!oldChick.isEmpty()&&!oldChick.equals(inputs.get(2).getText().toString()))||(!oldDate.isEmpty()&&!oldDate.equals(inputs.get(5).getText().toString()))){Toast.makeText(this,"این گواهی قبلاً ثبت شده است؛ سهمیه، تعداد جوجه‌ریزی و تاریخ جوجه‌ریزی باید همان اطلاعات اولیه گواهی باشد.",Toast.LENGTH_LONG).show();return;}}
             if(!checkQuotaLimits(old)){Toast.makeText(this,"مقدار ذرت یا سویا از سهمیه این گواهی بیشتر می‌شود.",Toast.LENGTH_LONG).show();return;}
-            JSONObject r=new JSONObject();for(int i=0;i<keys.length;i++){String v=inputs.get(i).getText().toString();if(i==0)v=unit;if(i==7)v=String.valueOf(commoditySp.getSelectedItem());if(i==11)v=String.valueOf(paymentSp.getSelectedItem());if(i==17)v=String.valueOf(companySp.getSelectedItem());r.put(keys[i],v);}r.put("id",old==null?UUID.randomUUID().toString():old.optString("id"));r.put("buyer",unit);boolean alarmConfigured=ds.trim().matches("\\d+")&&tm.trim().matches("([01]\\d|2[0-3]):[0-5]\\d")&&!inputs.get(18).getText().toString().trim().isEmpty();r.remove("subDue");r.put("collected",old!=null&&old.optBoolean("collected",false));r.put("collectedDate",old==null?"":old.optString("collectedDate",""));r.put("allocated",old!=null&&old.optBoolean("allocated",false));r.put("funding",old!=null&&old.has("funding")?old.optJSONArray("funding"):new JSONArray());r.put("alarm",alarmConfigured);r.put("alarmDays",parseInt(ds,1));r.put("alarmTime",tm.trim());r.put("alarmRepeat",repeat);
+            JSONObject r=new JSONObject();for(int i=0;i<keys.length;i++){String v=inputs.get(i).getText().toString();if(i==0)v=unit;if(i==7)v=String.valueOf(commoditySp.getSelectedItem());if(i==11)v=String.valueOf(paymentSp.getSelectedItem());if(i==17)v=String.valueOf(companySp.getSelectedItem());r.put(keys[i],v);}
+            r.put("paymentDetail",paymentDetailSp==null||paymentDetailSp.getSelectedItem()==null?"":String.valueOf(paymentDetailSp.getSelectedItem()));
+            r.put("cardRegistrationDate",cardDateInput==null?"":cardDateInput.getText().toString().trim());
+            r.put("id",old==null?UUID.randomUUID().toString():old.optString("id"));r.put("buyer",unit);boolean alarmConfigured=ds.trim().matches("\\d+")&&tm.trim().matches("([01]\\d|2[0-3]):[0-5]\\d")&&!inputs.get(18).getText().toString().trim().isEmpty();r.remove("subDue");r.put("collected",old!=null&&old.optBoolean("collected",false));r.put("collectedDate",old==null?"":old.optString("collectedDate",""));r.put("allocated",old!=null&&old.optBoolean("allocated",false));r.put("funding",old!=null&&old.has("funding")?old.optJSONArray("funding"):new JSONArray());r.put("alarm",alarmConfigured);r.put("alarmDays",parseInt(ds,1));r.put("alarmTime",tm.trim());r.put("alarmRepeat",repeat);
             JSONArray a=AppData.arr(data,"purchases");boolean replaced=false;for(int i=0;i<a.length();i++)if(a.optJSONObject(i).optString("id").equals(r.optString("id"))){a.put(i,r);replaced=true;break;}if(!replaced)a.put(r);data.put("purchases",a);updateCertificateCompletion(unit,cert);addUnique("units",unit);addUnique("buyers",unit);addUnique("companies",r.optString("company"));AppData.save(this,data);if(alarmConfigured)schedule(this,r);else cancelAlarm(this,r);boolean complete=isCertificateComplete(unit,cert);Toast.makeText(this,complete?"خرید با موفقیت ذخیره شد؛ خرید سهمیه این گواهی تکمیل شد.":"خرید با موفقیت ذخیره شد",Toast.LENGTH_LONG).show();goHome();
         }catch(Exception e){Toast.makeText(this,"خطا در ذخیره اطلاعات",Toast.LENGTH_LONG).show();}
     }
@@ -382,6 +438,8 @@ public class MainActivity extends Activity {
         base("جزئیات کامل خرید");
         add(tv("🏠 "+p.optString("unit",p.optString("buyer"))+"\nگواهی: "+p.optString("healthCertificate")+"\nشماره خرید: "+p.optString("purchaseNo"),19));
         for(int i=0;i<keys.length;i++)add(tv(labels[i]+": "+p.optString(keys[i],"-"),15));
+        add(tv("جزئیات پرداخت: "+p.optString("paymentDetail","-"),15));
+        add(tv("تاریخ ثبت کارت: "+p.optString("cardRegistrationDate",p.optString("cardDate","-")),15));
         String unitName=p.optString("unit",p.optString("buyer"));String cert=p.optString("healthCertificate");JSONObject cb=certificateBase(unitName+"|"+cert,null);if(cb!=null){double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");add(tv("📌 وضعیت سهمیه این گواهی\nسهمیه اولیه ذرت: "+fmtDecimal(cq)+" کیلوگرم\nخریدشده ذرت: "+fmtDecimal(usedCorn(unitName,cert,null))+" | مانده: "+fmtDecimal(Math.max(0,cq-usedCorn(unitName,cert,null)))+" کیلوگرم\nسهمیه اولیه سویا: "+fmtDecimal(sq)+" کیلوگرم\nخریدشده سویا: "+fmtDecimal(usedSoy(unitName,cert,null))+" | مانده: "+fmtDecimal(Math.max(0,sq-usedSoy(unitName,cert,null)))+" کیلوگرم\n"+(isCertificateComplete(unitName,cert)?"✅ تکمیل خرید سهمیه":"⏳ سهمیه هنوز تکمیل نشده است"),15));}
         add(tv("وضعیت وصول: "+(p.optBoolean("collected")?"✅ وصول شد":"⏳ وصول نشده")+
                 (p.optString("collectedDate").isEmpty()?"":" | تاریخ وصول: "+p.optString("collectedDate")),16));
@@ -408,7 +466,6 @@ public class MainActivity extends Activity {
         al.setOnClickListener(v->changeBoolean(p,"allocated","تخصیص"));add(al);
         Button fu=btn("💳 تأمین موجودی");fu.setOnClickListener(v->fundingDialog(p));add(fu);
         Button remA=btn("🔕 حذف آلارم");remA.setOnClickListener(v->{try{p.put("alarm",false);AppData.save(this,data);cancelAlarm(this,p);details(p);}catch(Exception ignored){}});add(remA);
-        Button ex=btn("📊 خروجی Excel همین خرید");ex.setOnClickListener(v->exportExcel(new JSONArray().put(p),"purchase_"+p.optString("purchaseNo")));add(ex);
         Button ed=btn("✏️ ویرایش");ed.setOnClickListener(v->openPage(()->form(p)));add(ed);
         Button same=btn("🏠 پرونده "+p.optString("unit",p.optString("buyer")));same.setOnClickListener(v->openPage(()->listPurchases(p.optString("unit",p.optString("buyer")))));add(same);
         Button del=btn("🗑 حذف");del.setOnClickListener(v->confirmDelete(p));add(del);
@@ -476,8 +533,7 @@ public class MainActivity extends Activity {
         base("پرونده واحد: "+buyer);
         JSONArray a=AppData.arr(data,"purchases");
         int n=0,coll=0,alloc=0,fullFund=0,fullQuota=0;
-        long total=0,colAmt=0,fundedAmt=0,unfundedAmt=0;
-        double totalCornQuota=0,remainingCornQuota=0,totalSoyQuota=0,remainingSoyQuota=0;
+        long total=0,colAmt=0,fundedAmt=0,unfundedAmt=0;double totalQuota=0,remainingQuota=0;
         ArrayList<JSONObject> noColl=new ArrayList<>(),noAlloc=new ArrayList<>(),noFund=new ArrayList<>();
         HashSet<String> certKeys=new HashSet<>();
         ArrayList<String> incompleteCerts=new ArrayList<>();
@@ -499,10 +555,7 @@ public class MainActivity extends Activity {
                         double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");
                         double rc=Math.max(0,cq-usedCorn(buyer,cert,null));
                         double rs=Math.max(0,sq-usedSoy(buyer,cert,null));
-                        totalCornQuota+=cq;
-                        remainingCornQuota+=rc;
-                        totalSoyQuota+=sq;
-                        remainingSoyQuota+=rs;
+                        totalQuota+=cq+sq;remainingQuota+=rc+rs;
                         boolean complete=rc<=0.0001&&rs<=0.0001;
                         if(complete)fullQuota++;else incompleteCerts.add(cert);
                     }
@@ -520,10 +573,8 @@ public class MainActivity extends Activity {
                 "\nتأمین ناقص: "+(n-fullFund)+" خرید"+
                 "\nمجموع تأمین‌شده: "+AppData.fmt(""+fundedAmt)+" ریال"+
                 "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfundedAmt)+" ریال"+
-                "\nمجموع سهمیه سویا: "+fmtDecimal(totalSoyQuota)+" کیلوگرم"+
-                "\nمانده سهمیه سویا: "+fmtDecimal(remainingSoyQuota)+" کیلوگرم"+
-                "\nمجموع سهمیه ذرت: "+fmtDecimal(totalCornQuota)+" کیلوگرم"+
-                "\nمانده سهمیه ذرت: "+fmtDecimal(remainingCornQuota)+" کیلوگرم"+
+                "\nمجموع سهمیه: "+fmtDecimal(totalQuota)+" کیلوگرم"+
+                "\nسهمیه مانده: "+fmtDecimal(remainingQuota)+" کیلوگرم"+
                 "\nگواهی‌های کامل: "+fullQuota+" | گواهی‌های دارای مانده: "+incompleteCerts.size(),15));
 
         add(tv("شماره‌های وصول‌نشده",15));addPurchaseNumberList(noColl);
@@ -541,9 +592,6 @@ public class MainActivity extends Activity {
                 cbn.setOnClickListener(v->openPage(()->certificateFile(buyer,cert)));add(cbn);
             }
         }
-
-        Button certs=btn("📂 خرید بر اساس گواهی بهداشتی");
-        certs.setOnClickListener(v->openPage(()->certificateIndex(buyer)));add(certs);
 
         add(tv("فیلتر سریع خریدهای این واحد",16));
         LinearLayout row1=new LinearLayout(this),row2=new LinearLayout(this);
@@ -569,6 +617,51 @@ public class MainActivity extends Activity {
 
         Button stat=btn("📊 آمار بازه زمانی");stat.setOnClickListener(v->buyerStats(buyer));add(stat);
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده واحد");
+    }
+
+    void incompleteFundingPage(){ simpleIncompletePage("تأمین موجودی",p->fundingRemaining(p)>0,"هنوز خریدی با تأمین موجودی ناقص وجود ندارد."); }
+    void incompleteCollectionPage(){ simpleIncompletePage("وصول",p->!p.optBoolean("collected",false),"همه خریدها وصول شده‌اند."); }
+    void incompleteAllocationPage(){ simpleIncompletePage("تخصیص",p->!p.optBoolean("allocated",false),"همه خریدها تخصیص شده‌اند."); }
+
+    interface PurchaseFilter{boolean accept(JSONObject p);}
+    void simpleIncompletePage(String title,PurchaseFilter filter,String empty){
+        base(title);
+        LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
+        JSONArray a=sortedPurchases();int count=0;
+        for(int i=0;i<a.length();i++){
+            JSONObject p=a.optJSONObject(i);if(p==null||!filter.accept(p))continue;
+            count++;
+            String unit=p.optString("unit",p.optString("buyer")),no=p.optString("purchaseNo"),cert=p.optString("healthCertificate");
+            Button b=btn("🏠 "+unit+" | خرید "+no+
+                    "\nگواهی: "+(cert.isEmpty()?"-":cert)+" | تاریخ: "+p.optString("buyDate")+
+                    "\nمبلغ: "+AppData.fmt(p.optString("amount"))+" ریال");
+            b.setOnClickListener(v->openPage(()->details(p)));list.addView(b);
+        }
+        if(count==0)add(tv(empty,15));
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen(title);
+    }
+
+    void certificateHome(){
+        base("خرید بر اساس گواهی بهداشتی");
+        JSONArray a=sortedPurchases();LinkedHashMap<String,Boolean> keys=new LinkedHashMap<>();
+        for(int i=0;i<a.length();i++){
+            JSONObject p=a.optJSONObject(i);if(p==null)continue;
+            String unit=p.optString("unit",p.optString("buyer")).trim(),cert=p.optString("healthCertificate").trim();
+            if(!unit.isEmpty()&&!cert.isEmpty())keys.put(unit+"|"+cert,true);
+        }
+        if(keys.isEmpty())add(tv("هنوز گواهی بهداشتی ثبت نشده است.",15));
+        for(String key:keys.keySet()){
+            String[] parts=key.split("\\|",2);String unit=parts[0],cert=parts[1];
+            Button b=btn("🏠 "+unit+"\n📁 گواهی "+cert);
+            b.setOnClickListener(v->openPage(()->certificateFile(unit,cert)));add(b);
+        }
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("خرید بر اساس گواهی بهداشتی");
+    }
+
+    void quotaTransferPlaceholder(){
+        base("انتقال مانده سهمیه به شاهدانه");
+        add(tv("این بخش فعلاً آماده‌سازی شده و هنوز عملکردی برای آن تعریف نشده است.",15));
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("انتقال مانده سهمیه به شاهدانه");
     }
 
     void certificateIndex(String unit){
