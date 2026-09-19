@@ -530,6 +530,7 @@ public class MainActivity extends Activity {
                     "\nسهمیه اولیه ذرت: "+fmtDecimal(initialCorn)+" کیلوگرم"+
                     "\nخرید شده ذرت: "+fmtDecimal(purchasedCorn)+" کیلوگرم"+
                     "\nمانده سهمیه ذرت: "+fmtDecimal(remainingCorn)+" کیلوگرم"+
+                    "\nذرت انتقال داده: "+fmtDecimal(transferredCorn)+" کیلوگرم"+
                     "\nسهمیه اولیه سویا: "+fmtDecimal(initialSoy)+" کیلوگرم"+
                     "\nخرید شده سویا: "+fmtDecimal(purchasedSoy)+" کیلوگرم"+
                     "\nمانده سهمیه سویا: "+fmtDecimal(remainingSoy)+" کیلوگرم"+
@@ -686,6 +687,7 @@ public class MainActivity extends Activity {
                 "\nسهمیه اولیه ذرت: "+fmtDecimal(initialCorn)+" کیلوگرم"+
                 "\nخرید شده ذرت: "+fmtDecimal(purchasedCorn)+" کیلوگرم"+
                 "\nمانده سهمیه ذرت: "+fmtDecimal(remainingCorn)+" کیلوگرم"+
+                    "\nذرت انتقال داده: "+fmtDecimal(transferredCorn)+" کیلوگرم"+
                 "\nسهمیه اولیه سویا: "+fmtDecimal(initialSoy)+" کیلوگرم"+
                 "\nخرید شده سویا: "+fmtDecimal(purchasedSoy)+" کیلوگرم"+
                 "\nمانده سهمیه سویا: "+fmtDecimal(remainingSoy)+" کیلوگرم"+
@@ -931,7 +933,7 @@ public class MainActivity extends Activity {
         Button b=btn("نمایش آمار");add(b);TextView out=tv("",15);add(out);
         b.setOnClickListener(v->{
             int n=0,c=0,a=0,ff=0,qf=0;long total=0,funded=0,unfunded=0;
-            double initialCorn=0,purchasedCorn=0,remainingCorn=0,initialSoy=0,purchasedSoy=0,remainingSoy=0;
+            double initialCorn=0,purchasedCorn=0,remainingCorn=0,transferredCorn=0,initialSoy=0,purchasedSoy=0,remainingSoy=0,transferredSoy=0;
             HashSet<String> certKeys=new HashSet<>();
             JSONArray p=AppData.arr(data,"purchases");
             for(int i=0;i<p.length();i++){
@@ -969,9 +971,11 @@ public class MainActivity extends Activity {
                     "\nسهمیه اولیه ذرت: "+fmtDecimal(initialCorn)+" کیلوگرم"+
                     "\nخرید شده ذرت: "+fmtDecimal(purchasedCorn)+" کیلوگرم"+
                     "\nمانده سهمیه ذرت: "+fmtDecimal(remainingCorn)+" کیلوگرم"+
+                    "\nذرت انتقال داده: "+fmtDecimal(transferredCorn)+" کیلوگرم"+
                     "\nسهمیه اولیه سویا: "+fmtDecimal(initialSoy)+" کیلوگرم"+
                     "\nخرید شده سویا: "+fmtDecimal(purchasedSoy)+" کیلوگرم"+
-                    "\nمانده سهمیه سویا: "+fmtDecimal(remainingSoy)+" کیلوگرم");
+                    "\nمانده سهمیه سویا: "+fmtDecimal(remainingSoy)+" کیلوگرم"+
+                    "\nسویا انتقال داده: "+fmtDecimal(transferredSoy)+" کیلوگرم");
         });
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("آمار");
     }
