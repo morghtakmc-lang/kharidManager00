@@ -843,7 +843,7 @@ public class MainActivity extends Activity {
             summary.setText("آمار کل انتقال در بازه\nتعداد انتقال‌ها: "+n+"\nذرت انتقال داده: "+fmtDecimal(tc)+" کیلوگرم\nسویا انتقال داده: "+fmtDecimal(ts)+" کیلوگرم\nمجموع انتقال سهمیه: "+fmtDecimal(tc+ts)+" کیلوگرم");if(n==0)add(tv("هیچ انتقالی در این بازه ثبت نشده است.",15));};
         show.setOnClickListener(v->render.run());render.run();Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("انتقال مانده سهمیه به شاهدانه");
     }
-void shahedanehFile(String from,String to){
+    void shahedanehFile(String from,String to){
         base("شاهدانه طیور مارلیک");
         String f=from==null?"":from.trim(), t=to==null?"":to.trim();
         JSONArray tr=quotaTransfers();
@@ -851,9 +851,7 @@ void shahedanehFile(String from,String to){
         double cornTransfer=0,soyTransfer=0,cornPurchased=0,soyPurchased=0;
         int transferCount=0,purchaseCount=0;
         StringBuilder out=new StringBuilder();
-        out.append("سوابق انتقال سهمیه به شاهدانه
-
-");
+        out.append("سوابق انتقال سهمیه به شاهدانه\n\n");
         for(int i=0;i<tr.length();i++){
             JSONObject x=tr.optJSONObject(i);if(x==null)continue;
             String d=x.optString("date").trim();
@@ -866,16 +864,11 @@ void shahedanehFile(String from,String to){
             else continue;
             out.append(" کیلوگرم | از واحد: ").append(x.optString("unit","-"))
                .append(" | گواهی: ").append(x.optString("healthCertificate","-"))
-               .append(" | تاریخ: ").append(d).append("
-");
+               .append(" | تاریخ: ").append(d).append("\n");
             transferCount++;
         }
-        if(transferCount==0)out.append("هنوز انتقال سهمیه‌ای ثبت نشده است.
-");
-        out.append("
-سوابق خرید با سهمیه منتقل‌شده
-
-");
+        if(transferCount==0)out.append("هنوز انتقال سهمیه‌ای ثبت نشده است.\n");
+        out.append("\nسوابق خرید با سهمیه منتقل‌شده\n\n");
         for(int i=0;i<purchases.length();i++){
             JSONObject p=purchases.optJSONObject(i);if(p==null||!isShahedaneh(p.optString("unit",p.optString("buyer"))))continue;
             String d=p.optString("buyDate").trim();
@@ -887,32 +880,20 @@ void shahedanehFile(String from,String to){
                .append(" | تاریخ: ").append(d)
                .append(" | واحد مبدأ: ").append(p.optString("transferSourceUnit","-"))
                .append(" | گواهی مبدأ: ").append(p.optString("transferSourceCertificate",p.optString("healthCertificate","-")))
-               .append("
-ذرت مصرفی: ").append(fmtDecimal(c)).append(" | سویا مصرفی: ").append(fmtDecimal(s)).append(" کیلوگرم
-");
+               .append("\nذرت مصرفی: ").append(fmtDecimal(c)).append(" | سویا مصرفی: ").append(fmtDecimal(s)).append(" کیلوگرم\n");
         }
-        if(purchaseCount==0)out.append("هنوز خریدی با سهمیه منتقل‌شده ثبت نشده است.
-");
-        out.append("
-آمار شاهدانه طیور مارلیک در بازه
-")
+        if(purchaseCount==0)out.append("هنوز خریدی با سهمیه منتقل‌شده ثبت نشده است.\n");
+        out.append("\nآمار شاهدانه طیور مارلیک در بازه\n")
            .append("تعداد انتقال: ").append(transferCount)
-           .append("
-ذرت انتقال داده شده: ").append(fmtDecimal(cornTransfer)).append(" کیلوگرم")
-           .append("
-سویا انتقال داده شده: ").append(fmtDecimal(soyTransfer)).append(" کیلوگرم")
-           .append("
-ذرت مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(cornPurchased)).append(" کیلوگرم")
-           .append("
-سویا مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(soyPurchased)).append(" کیلوگرم")
-           .append("
-مانده سهمیه انتقالی ذرت: ").append(fmtDecimal(Math.max(0,cornTransfer-cornPurchased))).append(" کیلوگرم")
-           .append("
-مانده سهمیه انتقالی سویا: ").append(fmtDecimal(Math.max(0,soyTransfer-soyPurchased))).append(" کیلوگرم");
+           .append("\nذرت انتقال داده شده: ").append(fmtDecimal(cornTransfer)).append(" کیلوگرم")
+           .append("\nسویا انتقال داده شده: ").append(fmtDecimal(soyTransfer)).append(" کیلوگرم")
+           .append("\nذرت مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(cornPurchased)).append(" کیلوگرم")
+           .append("\nسویا مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(soyPurchased)).append(" کیلوگرم")
+           .append("\nمانده سهمیه انتقالی ذرت: ").append(fmtDecimal(Math.max(0,cornTransfer-cornPurchased))).append(" کیلوگرم")
+           .append("\nمانده سهمیه انتقالی سویا: ").append(fmtDecimal(Math.max(0,soyTransfer-soyPurchased))).append(" کیلوگرم");
         add(tv(out.toString(),15));
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("شاهدانه طیور مارلیک");
     }
-
 
     void transferUnitFile(String unit,String from,String to){
         base("پرونده انتقال: "+unit);LinkedHashSet<String> certs=new LinkedHashSet<>();JSONArray tr=quotaTransfers();for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null||!unit.equals(x.optString("unit")))continue;String d=x.optString("date");if(!from.isEmpty()&&d.compareTo(from)<0)continue;if(!to.isEmpty()&&d.compareTo(to)>0)continue;String c=x.optString("healthCertificate").trim();if(!c.isEmpty())certs.add(c);}if(certs.isEmpty())add(tv("برای این واحد انتقالی در بازه انتخاب‌شده وجود ندارد.",15));for(String c:certs){Button b=btn("📁 گواهی بهداشتی "+c);b.setOnClickListener(v->openPage(()->transferCertificateFile(unit,c,from,to)));add(b);}Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده انتقال");
