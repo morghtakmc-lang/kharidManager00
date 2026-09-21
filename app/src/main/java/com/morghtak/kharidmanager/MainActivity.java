@@ -499,17 +499,15 @@ public class MainActivity extends Activity {
                 if(collected){col++;} if(allocated)alloc++; if(fundComplete)fullFund++;
                 if(quotaComplete)fullQuota++;
 
-                if(!cert.isEmpty() && !isShahedaneh(unit)){
+                if(!cert.isEmpty()){
                     String ck=unit+"|"+cert;
                     if(certificateKeys.add(ck)){
                         JSONObject baseCert=certificateBase(ck,null);
                         if(baseCert!=null){
                             double cq=quotaOriginal(baseCert,"cornQuota"),sq=quotaOriginal(baseCert,"soyQuota");
-                            double tc=transferAmount(unit,cert,"corn"),ts=transferAmount(unit,cert,"soy");
-                            double uc=usedCorn(unit,cert,null),us=usedSoy(unit,cert,null);
-                            double remC=Math.max(0,cq-uc-tc),remS=Math.max(0,sq-us-ts);
-                            initialCorn+=cq; purchasedCorn+=uc; remainingCorn+=remC; transferredCorn+=tc;
-                            initialSoy+=sq; purchasedSoy+=us; remainingSoy+=remS; transferredSoy+=ts;
+                            double remC=Math.max(0,cq-usedCorn(unit,cert,null)-transferAmount(unit,cert,"corn"));
+                            double remS=Math.max(0,sq-usedSoy(unit,cert,null)-transferAmount(unit,cert,"soy"));
+                            initialCorn+=cq; purchasedCorn+=usedCorn(unit,cert,null); remainingCorn+=remC; initialSoy+=sq; purchasedSoy+=usedSoy(unit,cert,null); remainingSoy+=remS; transferredCorn+=transferAmount(unit,cert,"corn"); transferredSoy+=transferAmount(unit,cert,"soy");
                         }
                     }
                 }
@@ -529,7 +527,7 @@ public class MainActivity extends Activity {
                     "\nوصول: "+col+" | تخصیص: "+alloc+" | تأمین کامل: "+fullFund+" | سهمیه کامل: "+fullQuota+
                     "\nمجموع تأمین‌شده: "+AppData.fmt(""+funded)+" ریال"+
                     "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfunded)+" ریال"+
-                    "\nسهمیه اولیه ذرت: "+fmtDecimal(initialCorn)+" کیلوگرم"+
+                    "\n"+inputWeightSummary(shown)+"\nسهمیه اولیه ذرت: "+fmtDecimal(initialCorn)+" کیلوگرم"+
                     "\nخرید شده ذرت: "+fmtDecimal(purchasedCorn)+" کیلوگرم"+
                     "\nذرت انتقال داده: "+fmtDecimal(transferredCorn)+" کیلوگرم"+
                     "\nمانده سهمیه ذرت: "+fmtDecimal(remainingCorn)+" کیلوگرم"+
@@ -552,6 +550,7 @@ public class MainActivity extends Activity {
         for(int i=0;i<keys.length;i++)add(tv(labels[i]+": "+p.optString(keys[i],"-"),15));
         add(tv("جزئیات پرداخت: "+p.optString("paymentDetail","-"),15)); if(isShahedaneh(unitName)){add(tv("🔄 منبع سهمیه منتقل‌شده\nواحد مبدأ: "+p.optString("transferSourceUnit","-")+"\nگواهی مبدأ: "+p.optString("transferSourceCertificate",p.optString("healthCertificate","-"))+"\nنوع منشأ: انتقال مانده سهمیه به شاهدانه",15));}
         add(tv("تاریخ ثبت کارت: "+p.optString("cardRegistrationDate",p.optString("cardDate","-")),15));
+        add(tv("نوع نهاده / وزن:\n• "+p.optString("commodity","-")+" : "+fmtDecimal(toDouble(p.optString("weight")))+" کیلوگرم",15));
         String cert=p.optString("healthCertificate");JSONObject cb=certificateBase(unitName+"|"+cert,null);if(cb!=null){double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota"),uc=usedCorn(unitName,cert,null),us=usedSoy(unitName,cert,null),tc=transferAmount(unitName,cert,"corn"),ts=transferAmount(unitName,cert,"soy");add(tv("📌 وضعیت سهمیه این گواهی\nسهمیه اولیه ذرت: "+fmtDecimal(cq)+" کیلوگرم\nخریدشده ذرت: "+fmtDecimal(uc)+" | مانده سهمیه: "+fmtDecimal(Math.max(0,cq-uc-tc))+" کیلوگرم\nذرت منتقل‌شده به شاهدانه: "+fmtDecimal(tc)+" کیلوگرم\nسهمیه اولیه سویا: "+fmtDecimal(sq)+" کیلوگرم\nخریدشده سویا: "+fmtDecimal(us)+" | مانده سهمیه: "+fmtDecimal(Math.max(0,sq-us-ts))+" کیلوگرم\nسویا منتقل‌شده به شاهدانه: "+fmtDecimal(ts)+" کیلوگرم\n"+(isCertificateComplete(unitName,cert)?"✅ تکمیل خرید سهمیه":"⏳ سهمیه هنوز تکمیل نشده است"),15));}
         add(tv("وضعیت وصول: "+(p.optBoolean("collected")?"✅ وصول شد":"⏳ وصول نشده")+
                 (p.optString("collectedDate").isEmpty()?"":" | تاریخ وصول: "+p.optString("collectedDate")),16));
@@ -667,7 +666,7 @@ public class MainActivity extends Activity {
                         double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");
                         double rc=Math.max(0,cq-usedCorn(buyer,cert,null)-transferAmount(buyer,cert,"corn"));
                         double rs=Math.max(0,sq-usedSoy(buyer,cert,null)-transferAmount(buyer,cert,"soy"));
-                        initialCorn+=cq; purchasedCorn+=usedCorn(buyer,cert,null); remainingCorn+=rc; initialSoy+=sq; purchasedSoy+=usedSoy(buyer,cert,null); remainingSoy+=rs;
+                        initialCorn+=cq; purchasedCorn+=usedCorn(buyer,cert,null); transferredCorn+=transferAmount(buyer,cert,"corn"); remainingCorn+=rc; initialSoy+=sq; purchasedSoy+=usedSoy(buyer,cert,null); transferredSoy+=transferAmount(buyer,cert,"soy"); remainingSoy+=rs;
                         boolean complete=rc<=0.0001&&rs<=0.0001;
                         if(complete)fullQuota++;else incompleteCerts.add(cert);
                     }
@@ -685,6 +684,7 @@ public class MainActivity extends Activity {
                 "\nتأمین ناقص: "+(n-fullFund)+" خرید"+
                 "\nمجموع تأمین‌شده: "+AppData.fmt(""+fundedAmt)+" ریال"+
                 "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfundedAmt)+" ریال"+
+                "\n"+inputWeightSummary(purchasesInRange(buyer,"", ""))+
                 "\nسهمیه اولیه ذرت: "+fmtDecimal(initialCorn)+" کیلوگرم"+
                 "\nخرید شده ذرت: "+fmtDecimal(purchasedCorn)+" کیلوگرم"+
                 "\nذرت انتقال داده: "+fmtDecimal(transferredCorn)+" کیلوگرم"+
@@ -748,9 +748,6 @@ public class MainActivity extends Activity {
         LinearLayout dates=new LinearLayout(this);dates.setOrientation(LinearLayout.HORIZONTAL);
         EditText from=new EditText(this),to=new EditText(this);from.setHint("از تاریخ");to.setHint("تا تاریخ");from.setSingleLine(true);to.setSingleLine(true);from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));
         dates.addView(from,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));dates.addView(to,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(dates);
-        Button marlik=btn("🏢 شاهدانه طیور مارلیک");
-        marlik.setOnClickListener(v->openPage(()->shahedanehFile(from.getText().toString().trim(),to.getText().toString().trim())));
-        add(marlik);
         Button show=btn("🔎 نمایش در بازه");add(show);TextView summary=tv("",14);add(summary);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
         Runnable render=()->{list.removeAllViews();int count=0;long total=0,remaining=0;long funded=0;JSONArray a=sortedPurchases();String f=from.getText().toString().trim(),t=to.getText().toString().trim();
             for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||!filter.accept(p))continue;String d=p.optString("buyDate");if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;count++;long amt=toLong(p.optString("amount"));total+=amt;long rem=fundingRemaining(p);remaining+=rem;funded+=totalFunded(p);String unit=p.optString("unit",p.optString("buyer")),no=p.optString("purchaseNo"),cert=p.optString("healthCertificate");Button b=btn("🏠 "+unit+" | خرید "+no+"\nگواهی: "+(cert.isEmpty()?"-":cert)+" | تاریخ: "+d+"\nمبلغ: "+AppData.fmt(p.optString("amount"))+" ریال");b.setOnClickListener(v->openPage(()->details(p)));list.addView(b);}
@@ -766,12 +763,30 @@ public class MainActivity extends Activity {
         base("خرید بر اساس گواهی بهداشتی");
         LinearLayout dates=new LinearLayout(this);dates.setOrientation(LinearLayout.HORIZONTAL);EditText from=new EditText(this),to=new EditText(this);from.setHint("از تاریخ");to.setHint("تا تاریخ");from.setSingleLine(true);to.setSingleLine(true);from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));dates.addView(from,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));dates.addView(to,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(dates);
         Button show=btn("🔎 نمایش گواهی‌ها در بازه");add(show);TextView summary=tv("",14);add(summary);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
-        Runnable render=()->{list.removeAllViews();int certCount=0;double ic=0,pc=0,rc=0,is=0,ps=0,rs=0;HashSet<String> done=new HashSet<>();String f=from.getText().toString().trim(),t=to.getText().toString().trim();JSONArray a=sortedPurchases();
-            for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String unit=p.optString("unit",p.optString("buyer")).trim(),cert=p.optString("healthCertificate").trim();if(unit.isEmpty()||cert.isEmpty())continue;String d=p.optString("buyDate");if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;String k=unit+"|"+cert;if(!done.add(k))continue;JSONObject cb=certificateBase(k,null);if(cb==null)continue;double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota"),uc=usedCorn(unit,cert,null),us=usedSoy(unit,cert,null),rcc=Math.max(0,cq-uc-transferAmount(unit,cert,"corn")),rss=Math.max(0,sq-us-transferAmount(unit,cert,"soy"));ic+=cq;pc+=uc;rc+=rcc;is+=sq;ps+=us;rs+=rss;certCount++;Button b=btn("🏠 "+unit+"\n📁 گواهی "+cert+"\nمانده ذرت: "+fmtDecimal(rcc)+" | مانده سویا: "+fmtDecimal(rss));b.setOnClickListener(v->openPage(()->certificateFile(unit,cert)));list.addView(b);}
-            summary.setText("آمار کل گواهی‌ها در بازه\nتعداد گواهی: "+certCount+"\nسهمیه اولیه ذرت: "+fmtDecimal(ic)+" کیلوگرم\nخرید شده ذرت: "+fmtDecimal(pc)+" کیلوگرم\nذرت انتقال داده: "+fmtDecimal(ic-pc-rc)+" کیلوگرم\nمانده سهمیه ذرت: "+fmtDecimal(rc)+" کیلوگرم\nسهمیه اولیه سویا: "+fmtDecimal(is)+" کیلوگرم\nخرید شده سویا: "+fmtDecimal(ps)+" کیلوگرم\nسویا انتقال داده: "+fmtDecimal(is-ps-rs)+" کیلوگرم\nمانده سهمیه سویا: "+fmtDecimal(rs)+" کیلوگرم");if(certCount==0)add(tv("هنوز گواهی بهداشتی در این بازه ثبت نشده است.",15));};
+        Runnable render=()->{list.removeAllViews();int certCount=0;double ic=0,pc=0,tc=0,rc=0,is=0,ps=0,ts=0,rs=0;HashSet<String> done=new HashSet<>();String f=from.getText().toString().trim(),t=to.getText().toString().trim();JSONArray a=sortedPurchases();
+            for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String unit=p.optString("unit",p.optString("buyer")).trim(),cert=p.optString("healthCertificate").trim();if(unit.isEmpty()||cert.isEmpty()||isShahedaneh(unit))continue;String d=p.optString("buyDate");if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;String k=unit+"|"+cert;if(!done.add(k))continue;JSONObject cb=certificateBase(k,null);if(cb==null)continue;double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota"),uc=usedCorn(unit,cert,null),us=usedSoy(unit,cert,null),rcc=Math.max(0,cq-uc-transferAmount(unit,cert,"corn")),rss=Math.max(0,sq-us-transferAmount(unit,cert,"soy"));ic+=cq;pc+=uc;tc+=transferAmount(unit,cert,"corn");rc+=rcc;is+=sq;ps+=us;ts+=transferAmount(unit,cert,"soy");rs+=rss;certCount++;Button b=btn("🏠 "+unit+"\n📁 گواهی "+cert+"\nمانده ذرت: "+fmtDecimal(rcc)+" | مانده سویا: "+fmtDecimal(rss));b.setOnClickListener(v->openPage(()->certificateFile(unit,cert)));list.addView(b);}
+            summary.setText("آمار کل گواهی‌ها در بازه\nتعداد گواهی: "+certCount+"\n"+inputWeightSummary(purchasesInRange(null,f,t))+"\nسهمیه اولیه ذرت: "+fmtDecimal(ic)+" کیلوگرم\nخرید شده ذرت: "+fmtDecimal(pc)+" کیلوگرم\nذرت انتقال داده: "+fmtDecimal(ic-pc-rc)+" کیلوگرم\nمانده سهمیه ذرت: "+fmtDecimal(rc)+" کیلوگرم\nسهمیه اولیه سویا: "+fmtDecimal(is)+" کیلوگرم\nخرید شده سویا: "+fmtDecimal(ps)+" کیلوگرم\nسویا انتقال داده: "+fmtDecimal(is-ps-rs)+" کیلوگرم\nمانده سهمیه سویا: "+fmtDecimal(rs)+" کیلوگرم");if(certCount==0)add(tv("هنوز گواهی بهداشتی در این بازه ثبت نشده است.",15));};
         show.setOnClickListener(v->render.run());render.run();Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("خرید بر اساس گواهی بهداشتی");
     }
 
+    String inputWeightSummary(List<JSONObject> purchases){
+        LinkedHashMap<String,Double> sums=new LinkedHashMap<>();
+        for(JSONObject p:purchases){if(p==null)continue;String c=p.optString("commodity").trim();if(c.isEmpty())c="نامشخص";double w=toDouble(p.optString("weight"));sums.put(c,sums.getOrDefault(c,0d)+w);}
+        if(sums.isEmpty())return "نوع نهاده / وزن: موردی ثبت نشده است";
+        StringBuilder b=new StringBuilder("نوع نهاده / وزن:\n");
+        for(Map.Entry<String,Double> e:sums.entrySet())b.append("• ").append(e.getKey()).append(" : ").append(fmtDecimal(e.getValue())).append(" کیلوگرم\n");
+        return b.toString().trim();
+    }
+    List<JSONObject> purchasesInRange(String unit,String from,String to){
+        ArrayList<JSONObject> r=new ArrayList<>();JSONArray a=AppData.arr(data,"purchases");
+        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String u=p.optString("unit",p.optString("buyer")).trim();if(unit!=null&&!unit.equals(u))continue;String d=p.optString("buyDate").trim();if(from!=null&&!from.isEmpty()&&!d.isEmpty()&&d.compareTo(from)<0)continue;if(to!=null&&!to.isEmpty()&&!d.isEmpty()&&d.compareTo(to)>0)continue;r.add(p);}
+        return r;
+    }
+    List<JSONObject> purchasesInRangeForCertificate(String unit,String cert){
+        ArrayList<JSONObject> r=new ArrayList<>();JSONArray a=AppData.arr(data,"purchases");
+        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p!=null&&unit.equals(p.optString("unit",p.optString("buyer")))&&cert.equals(p.optString("healthCertificate")))r.add(p);}
+        return r;
+    }
     JSONArray quotaTransfers(){return AppData.arr(data,"quotaTransfers");}
     String transferCommodityName(String c){return "corn".equals(c)?"ذرت":"سویا";}
     double transferAmount(String unit,String cert,String commodity){
@@ -836,90 +851,39 @@ public class MainActivity extends Activity {
     void quotaTransferPlaceholder(){
         base("انتقال مانده سهمیه به شاهدانه");
         LinearLayout dates=new LinearLayout(this);dates.setOrientation(LinearLayout.HORIZONTAL);EditText from=new EditText(this),to=new EditText(this);from.setHint("از تاریخ");to.setHint("تا تاریخ");from.setSingleLine(true);to.setSingleLine(true);from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));dates.addView(from,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));dates.addView(to,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(dates);
-        Button show=btn("🔎 نمایش انتقال‌ها در بازه");add(show);TextView summary=tv("",14);add(summary);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
-        Runnable render=()->{list.removeAllViews();LinkedHashSet<String> units=new LinkedHashSet<>();double tc=0,ts=0;int n=0;String f=from.getText().toString().trim(),t=to.getText().toString().trim();JSONArray tr=quotaTransfers();
-            for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null)continue;String d=x.optString("date").trim();if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;String u=x.optString("unit").trim(),c=x.optString("healthCertificate").trim();if(u.isEmpty()||c.isEmpty())continue;units.add(u);n++;if("corn".equals(x.optString("commodity")))tc+=toDouble(x.optString("amount"));else if("soy".equals(x.optString("commodity")))ts+=toDouble(x.optString("amount"));}
-            for(String u:units){Button b=btn("🏠 "+u+"\n📁 پرونده انتقال‌های سهمیه");b.setOnClickListener(v->openPage(()->transferUnitFile(u,from.getText().toString().trim(),to.getText().toString().trim())));list.addView(b);}
-            summary.setText("آمار کل انتقال در بازه\nتعداد انتقال‌ها: "+n+"\nذرت انتقال داده: "+fmtDecimal(tc)+" کیلوگرم\nسویا انتقال داده: "+fmtDecimal(ts)+" کیلوگرم\nمجموع انتقال سهمیه: "+fmtDecimal(tc+ts)+" کیلوگرم");if(n==0)add(tv("هیچ انتقالی در این بازه ثبت نشده است.",15));};
+        Button marlik=btn("🏢 شاهدانه طیور مارلیک");marlik.setOnClickListener(v->openPage(()->shahedanehFile(from.getText().toString().trim(),to.getText().toString().trim())));add(marlik);
+        Button show=btn("🔎 نمایش گواهی‌های دارای مانده");add(show);TextView summary=tv("",14);add(summary);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
+        Runnable render=()->{list.removeAllViews();LinkedHashSet<String> keys=new LinkedHashSet<>();double tc=0,ts=0;String f=from.getText().toString().trim(),t=to.getText().toString().trim();JSONArray a=sortedPurchases();
+            for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String unit=p.optString("unit",p.optString("buyer")).trim(),cert=p.optString("healthCertificate").trim(),d=p.optString("buyDate").trim();if(unit.isEmpty()||cert.isEmpty()||isShahedaneh(unit))continue;if(!f.isEmpty()&&!d.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&!d.isEmpty()&&d.compareTo(t)>0)continue;keys.add(unit+"|"+cert);}
+            for(String key:keys){String[] z=key.split("\\|",2);if(z.length!=2)continue;String unit=z[0],cert=z[1];double rc=transferableRemaining(unit,cert,"corn"),rs=transferableRemaining(unit,cert,"soy");if(rc<=0.0001&&rs<=0.0001)continue;Button b=btn("🏠 "+unit+"\n📁 گواهی بهداشتی "+cert+"\nمانده ذرت: "+fmtDecimal(rc)+" | مانده سویا: "+fmtDecimal(rs)+" کیلوگرم");b.setOnClickListener(v->openPage(()->transferCertificateFile(unit,cert,f,t)));list.addView(b);}
+            JSONArray tr=quotaTransfers();for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null)continue;String d=x.optString("date").trim();if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;if("corn".equals(x.optString("commodity")))tc+=toDouble(x.optString("amount"));else if("soy".equals(x.optString("commodity")))ts+=toDouble(x.optString("amount"));}
+            summary.setText("آمار انتقال در بازه\nذرت انتقال داده شده: "+fmtDecimal(tc)+" کیلوگرم\nسویا انتقال داده شده: "+fmtDecimal(ts)+" کیلوگرم");if(list.getChildCount()==0)list.addView(tv("هیچ گواهی با مانده قابل انتقال وجود ندارد.",15));};
         show.setOnClickListener(v->render.run());render.run();Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("انتقال مانده سهمیه به شاهدانه");
     }
+
     void shahedanehFile(String from,String to){
-        base("شاهدانه طیور مارلیک");
-        String f=from==null?"":from.trim(), t=to==null?"":to.trim();
-        JSONArray tr=quotaTransfers();
-        JSONArray purchases=AppData.arr(data,"purchases");
-        double cornTransfer=0,soyTransfer=0,cornPurchased=0,soyPurchased=0;
-        int transferCount=0,purchaseCount=0;
-        StringBuilder out=new StringBuilder();
-        out.append("سوابق انتقال سهمیه به شاهدانه\n\n");
-        for(int i=0;i<tr.length();i++){
-            JSONObject x=tr.optJSONObject(i);if(x==null)continue;
-            String d=x.optString("date").trim();
-            if(!f.isEmpty()&&d.compareTo(f)<0)continue;
-            if(!t.isEmpty()&&d.compareTo(t)>0)continue;
-            double a=toDouble(x.optString("amount"));
-            String com=x.optString("commodity");
-            if("corn".equals(com)){cornTransfer+=a;out.append("🌽 ذرت: ").append(fmtDecimal(a));}
-            else if("soy".equals(com)){soyTransfer+=a;out.append("🌱 سویا: ").append(fmtDecimal(a));}
-            else continue;
-            out.append(" کیلوگرم | از واحد: ").append(x.optString("unit","-"))
-               .append(" | گواهی: ").append(x.optString("healthCertificate","-"))
-               .append(" | تاریخ: ").append(d).append("\n");
-            transferCount++;
-        }
-        if(transferCount==0)out.append("هنوز انتقال سهمیه‌ای ثبت نشده است.\n");
-        out.append("\nسوابق خرید با سهمیه منتقل‌شده\n\n");
-        for(int i=0;i<purchases.length();i++){
-            JSONObject p=purchases.optJSONObject(i);if(p==null||!isShahedaneh(p.optString("unit",p.optString("buyer"))))continue;
-            String d=p.optString("buyDate").trim();
-            if(!f.isEmpty()&&!d.isEmpty()&&d.compareTo(f)<0)continue;
-            if(!t.isEmpty()&&!d.isEmpty()&&d.compareTo(t)>0)continue;
-            double c=toDouble(p.optString("corn")),s=toDouble(p.optString("soy"));
-            cornPurchased+=c;soyPurchased+=s;purchaseCount++;
-            out.append("📄 خرید ").append(p.optString("purchaseNo","-"))
-               .append(" | تاریخ: ").append(d)
-               .append(" | واحد مبدأ: ").append(p.optString("transferSourceUnit","-"))
-               .append(" | گواهی مبدأ: ").append(p.optString("transferSourceCertificate",p.optString("healthCertificate","-")))
-               .append("\nذرت مصرفی: ").append(fmtDecimal(c)).append(" | سویا مصرفی: ").append(fmtDecimal(s)).append(" کیلوگرم\n");
-        }
-        if(purchaseCount==0)out.append("هنوز خریدی با سهمیه منتقل‌شده ثبت نشده است.\n");
-        out.append("\nآمار شاهدانه طیور مارلیک در بازه\n")
-           .append("تعداد انتقال: ").append(transferCount)
-           .append("\nذرت انتقال داده شده: ").append(fmtDecimal(cornTransfer)).append(" کیلوگرم")
-           .append("\nسویا انتقال داده شده: ").append(fmtDecimal(soyTransfer)).append(" کیلوگرم")
-           .append("\nذرت مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(cornPurchased)).append(" کیلوگرم")
-           .append("\nسویا مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(soyPurchased)).append(" کیلوگرم")
-           .append("\nمانده سهمیه انتقالی ذرت: ").append(fmtDecimal(Math.max(0,cornTransfer-cornPurchased))).append(" کیلوگرم")
-           .append("\nمانده سهمیه انتقالی سویا: ").append(fmtDecimal(Math.max(0,soyTransfer-soyPurchased))).append(" کیلوگرم");
-        add(tv(out.toString(),15));
-        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("شاهدانه طیور مارلیک");
+        base("شاهدانه طیور مارلیک");String f=from==null?"":from.trim(),t=to==null?"":to.trim();JSONArray tr=quotaTransfers(),purchases=AppData.arr(data,"purchases");double cornTransfer=0,soyTransfer=0,cornPurchased=0,soyPurchased=0;int transferCount=0,purchaseCount=0;StringBuilder out=new StringBuilder("سوابق انتقال سهمیه به شاهدانه\n\n");
+        for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null)continue;String d=x.optString("date").trim();if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;double a=toDouble(x.optString("amount"));if("corn".equals(x.optString("commodity"))){cornTransfer+=a;out.append("🌽 ذرت: ").append(fmtDecimal(a));}else if("soy".equals(x.optString("commodity"))){soyTransfer+=a;out.append("🌱 سویا: ").append(fmtDecimal(a));}else continue;transferCount++;out.append(" کیلوگرم | از واحد: ").append(x.optString("unit","-")).append(" | گواهی: ").append(x.optString("healthCertificate","-")).append(" | تاریخ: ").append(d).append("\n");}
+        out.append("سوابق خرید با سهمیه منتقل‌شده\n");for(int i=0;i<purchases.length();i++){JSONObject p=purchases.optJSONObject(i);if(p==null||!isShahedaneh(p.optString("unit",p.optString("buyer"))))continue;String d=p.optString("buyDate").trim();if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;double c=toDouble(p.optString("corn")),s=toDouble(p.optString("soy"));if(c<=0&&s<=0)continue;cornPurchased+=c;soyPurchased+=s;purchaseCount++;out.append("📄 خرید ").append(p.optString("purchaseNo","-")).append(" | تاریخ: ").append(d).append(" | واحد مبدأ: ").append(p.optString("transferSourceUnit","-")).append(" | گواهی مبدأ: ").append(p.optString("transferSourceCertificate",p.optString("healthCertificate","-"))).append("\nذرت مصرفی: ").append(fmtDecimal(c)).append(" | سویا مصرفی: ").append(fmtDecimal(s)).append(" کیلوگرم\n");}
+        if(purchaseCount==0)out.append("هنوز خریدی با سهمیه منتقل‌شده ثبت نشده است.\n");out.append("\nنوع نهاده / وزن در خریدهای مارلیک:\n").append(inputWeightSummary(purchasesInRange("شاهدانه طیور مارلیک",f,t)));out.append("\n\nآمار شاهدانه طیور مارلیک در بازه\nتعداد انتقال: ").append(transferCount).append("\nذرت انتقال داده شده: ").append(fmtDecimal(cornTransfer)).append(" کیلوگرم").append("\nسویا انتقال داده شده: ").append(fmtDecimal(soyTransfer)).append(" کیلوگرم").append("\nذرت مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(cornPurchased)).append(" کیلوگرم").append("\nسویا مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(soyPurchased)).append(" کیلوگرم").append("\nمانده سهمیه انتقالی ذرت: ").append(fmtDecimal(Math.max(0,cornTransfer-cornPurchased))).append(" کیلوگرم").append("\nمانده سهمیه انتقالی سویا: ").append(fmtDecimal(Math.max(0,soyTransfer-soyPurchased))).append(" کیلوگرم");
+        add(tv(out.toString(),15));Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("شاهدانه طیور مارلیک");
     }
 
-    void transferUnitFile(String unit,String from,String to){
-        base("پرونده انتقال: "+unit);LinkedHashSet<String> certs=new LinkedHashSet<>();JSONArray tr=quotaTransfers();for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null||!unit.equals(x.optString("unit")))continue;String d=x.optString("date");if(!from.isEmpty()&&d.compareTo(from)<0)continue;if(!to.isEmpty()&&d.compareTo(to)>0)continue;String c=x.optString("healthCertificate").trim();if(!c.isEmpty())certs.add(c);}if(certs.isEmpty())add(tv("برای این واحد انتقالی در بازه انتخاب‌شده وجود ندارد.",15));for(String c:certs){Button b=btn("📁 گواهی بهداشتی "+c);b.setOnClickListener(v->openPage(()->transferCertificateFile(unit,c,from,to)));add(b);}Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده انتقال");
-    }
     void transferCertificateFile(String unit,String cert,String from,String to){
         base("گواهی انتقال: "+cert);
-        double initialCorn=0,initialSoy=0;int n=0;JSONArray tr=quotaTransfers();StringBuilder out=new StringBuilder();
+        JSONObject cb=certificateBase(unit+"|"+cert,null);
+        double cq=cb==null?0:quotaOriginal(cb,"cornQuota"),sq=cb==null?0:quotaOriginal(cb,"soyQuota");
+        double uc=usedCorn(unit,cert,null),us=usedSoy(unit,cert,null),tc=transferAmount(unit,cert,"corn"),ts=transferAmount(unit,cert,"soy");
+        double rc=Math.max(0,cq-uc-tc),rs=Math.max(0,sq-us-ts);
+        JSONArray tr=quotaTransfers();StringBuilder out=new StringBuilder();
         out.append("واحد مبدأ: ").append(unit).append("\nگواهی بهداشتی: ").append(cert).append("\n\nسابقه انتقال‌ها:\n");
-        for(int i=0;i<tr.length();i++){
-            JSONObject x=tr.optJSONObject(i);if(x==null||!unit.equals(x.optString("unit"))||!cert.equals(x.optString("healthCertificate")))continue;
-            double a=toDouble(x.optString("amount"));
-            if("corn".equals(x.optString("commodity")))initialCorn+=a;else if("soy".equals(x.optString("commodity")))initialSoy+=a;
-            String d=x.optString("date");if(!from.isEmpty()&&d.compareTo(from)<0)continue;if(!to.isEmpty()&&d.compareTo(to)>0)continue;
-            if("corn".equals(x.optString("commodity")))out.append("ذرت: ").append(fmtDecimal(a));else if("soy".equals(x.optString("commodity")))out.append("سویا: ").append(fmtDecimal(a));
-            else continue;
-            out.append(" کیلوگرم | تاریخ: ").append(d).append("\n");n++;
-        }
-        out.append("\nسهمیه اولیه ذرت: ").append(fmtDecimal(initialCorn)).append(" کیلوگرم")
-           .append("\nخرید شده ذرت: 0 کیلوگرم")
-           .append("\nذرت انتقال داده: ").append(fmtDecimal(initialCorn)).append(" کیلوگرم")
-           .append("\nمانده سهمیه ذرت: 0 کیلوگرم")
-           .append("\nسهمیه اولیه سویا: ").append(fmtDecimal(initialSoy)).append(" کیلوگرم")
-           .append("\nخرید شده سویا: 0 کیلوگرم")
-           .append("\nسویا انتقال داده: ").append(fmtDecimal(initialSoy)).append(" کیلوگرم")
-           .append("\nمانده سهمیه سویا: 0 کیلوگرم");
-        add(tv(out.toString(),15));Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده گواهی انتقال");
+        for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null||!unit.equals(x.optString("unit"))||!cert.equals(x.optString("healthCertificate")))continue;String d=x.optString("date");if(!from.isEmpty()&&d.compareTo(from)<0)continue;if(!to.isEmpty()&&d.compareTo(to)>0)continue;double a=toDouble(x.optString("amount"));if("corn".equals(x.optString("commodity")))out.append("ذرت: ").append(fmtDecimal(a));else if("soy".equals(x.optString("commodity")))out.append("سویا: ").append(fmtDecimal(a));else continue;out.append(" کیلوگرم | تاریخ: ").append(d).append("\n");}
+        out.append("\nنوع نهاده / وزن:\n").append(inputWeightSummary(purchasesInRangeForCertificate(unit,cert)));
+        out.append("\nسهمیه اولیه ذرت: ").append(fmtDecimal(cq)).append(" کیلوگرم").append("\nذرت خرید شده: ").append(fmtDecimal(uc)).append(" کیلوگرم").append("\nذرت انتقال داده: ").append(fmtDecimal(tc)).append(" کیلوگرم").append("\nمانده سهمیه ذرت: ").append(fmtDecimal(rc)).append(" کیلوگرم").append("\nسهمیه اولیه سویا: ").append(fmtDecimal(sq)).append(" کیلوگرم").append("\nسویا خرید شده: ").append(fmtDecimal(us)).append(" کیلوگرم").append("\nسویا انتقال داده: ").append(fmtDecimal(ts)).append(" کیلوگرم").append("\nمانده سهمیه سویا: ").append(fmtDecimal(rs)).append(" کیلوگرم");
+        add(tv(out.toString(),15));
+        if(rc>0.0001){Button b=btn("⬆ انتقال مانده ذرت به شاهدانه");b.setOnClickListener(v->transferDialog(unit,cert,"corn",rc));add(b);}
+        if(rs>0.0001){Button b=btn("⬆ انتقال مانده سویا به شاهدانه");b.setOnClickListener(v->transferDialog(unit,cert,"soy",rs));add(b);}
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده گواهی انتقال");
     }
 
     void transferDialog(String unit,String cert,String commodity,double max){
@@ -962,6 +926,7 @@ public class MainActivity extends Activity {
                 "\nتعداد جوجه‌ریزی: "+cb.optString("chickCount")+
                 "\nتاریخ جوجه‌ریزی: "+cb.optString("placementDate")+
                 "\nتاریخ اعتبار: "+cb.optString("quotaExpiry"),15));
+        add(tv(inputWeightSummary(purchasesInRangeForCertificate(unit,cert)),15));
         double tc=transferAmount(unit,cert,"corn"),ts=transferAmount(unit,cert,"soy"); double tcr=transferRemaining(unit,cert,"corn"),tsr=transferRemaining(unit,cert,"soy");
         add(tv("وضعیت سهمیه\nذرت — اولیه: "+fmtDecimal(cq)+" | مصرف‌شده: "+fmtDecimal(uc)+" | مانده: "+fmtDecimal(rc)+
                 "\nذرت منتقل‌شده به شاهدانه: "+fmtDecimal(tc)+" کیلوگرم | مصرف‌شده از انتقال: "+fmtDecimal(Math.max(0,tc-tcr))+" | مانده انتقال: "+fmtDecimal(tcr)+
@@ -1050,6 +1015,7 @@ public class MainActivity extends Activity {
                     "\nسهمیه: "+qf+" گواهی کامل"+
                     "\nمجموع تأمین‌شده: "+AppData.fmt(""+funded)+" ریال"+
                     "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfunded)+" ریال"+
+                    "\n"+inputWeightSummary(purchasesInRange(buyer,f.getText().toString(),t.getText().toString()))+
                     "\nسهمیه اولیه ذرت: "+fmtDecimal(initialCorn)+" کیلوگرم"+
                     "\nخرید شده ذرت: "+fmtDecimal(purchasedCorn)+" کیلوگرم"+
                     "\nذرت انتقال داده: "+fmtDecimal(transferredCorn)+" کیلوگرم"+
