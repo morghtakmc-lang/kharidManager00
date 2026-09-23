@@ -102,7 +102,6 @@ public class MainActivity extends Activity {
         b=btn("🔔 سررسیدها"); b.setOnClickListener(v->openPage(this::deadlines)); add(b);
         b=btn("📂 خرید بر اساس گواهی بهداشتی"); b.setOnClickListener(v->openPage(this::certificateHome)); add(b);
         b=btn("🔄 انتقال مانده سهمیه به شاهدانه"); b.setOnClickListener(v->openPage(this::quotaTransferPlaceholder)); add(b);
-        b=btn("📊 گزارش‌ها و آمار"); b.setOnClickListener(v->openPage(this::reports)); add(b);
         b=btn("🏢 شرکت‌ها"); b.setOnClickListener(v->openPage(()->manage("companies","شرکت‌ها"))); add(b);
         b=btn("🌾 نهاده‌ها"); b.setOnClickListener(v->openPage(()->manage("commodities","نهاده‌ها"))); add(b);
         b=btn("🏦 حساب‌ها"); b.setOnClickListener(v->openPage(this::accountsPage)); add(b);
@@ -430,8 +429,9 @@ public class MainActivity extends Activity {
 
     void listPurchases(String fixedBuyer){
         base(fixedBuyer==null?"خریدهای ثبت‌شده":"پرونده "+fixedBuyer);
+
         EditText q=input("جستجو: نام واحد، گواهی، شماره خرید، شرکت یا نهاده");
-        LinearLayout dates=new LinearLayout(this);
+        LinearLayout dates=new LinearLayout(this); dates.setOrientation(LinearLayout.HORIZONTAL);
         EditText from=new EditText(this),to=new EditText(this);
         from.setHint("از تاریخ");to.setHint("تا تاریخ");from.setSingleLine(true);to.setSingleLine(true);
         from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));
@@ -457,13 +457,30 @@ public class MainActivity extends Activity {
         initialCollectedFilter=initialAllocatedFilter=initialFundingFilter=initialQuotaFilter=0;
 
         Button go=btn("🔎 اعمال فیلتر");add(go);
-        TextView summary=tv("",14);add(summary);
+
+        LinearLayout summaryBox=new LinearLayout(this); summaryBox.setOrientation(LinearLayout.VERTICAL);
+        summaryBox.setPadding(UiManager.dp(this,10),UiManager.dp(this,8),UiManager.dp(this,10),UiManager.dp(this,8));
+        GradientDrawable summaryBg=new GradientDrawable();
+        summaryBg.setColor(UiManager.card(this));
+        summaryBg.setCornerRadius(UiManager.dp(this,14));
+        summaryBg.setStroke(UiManager.dp(this,1),UiManager.secondary(this));
+        summaryBox.setBackground(summaryBg);
+        TextView summaryTitle=tv("📊  خلاصه نتایج نمایش‌داده‌شده",17);
+        summaryTitle.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        summaryTitle.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));
+        summaryTitle.setTextColor(UiManager.primary(this));
+        summaryBox.addView(summaryTitle,new LinearLayout.LayoutParams(-1,UiManager.dp(this,48)));
+        LinearLayout summaryGrid=new LinearLayout(this);summaryGrid.setOrientation(LinearLayout.VERTICAL);summaryBox.addView(summaryGrid);
+        add(summaryBox);
+
         LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
 
         Runnable render=()->{
             list.removeAllViews();
+            summaryGrid.removeAllViews();
             int count=0,col=0,alloc=0,fullFund=0,fullQuota=0;
-            long amount=0,funded=0,unfunded=0;double initialCorn=0,purchasedCorn=0,remainingCorn=0,initialSoy=0,purchasedSoy=0,remainingSoy=0,transferredCorn=0,transferredSoy=0;
+            long amount=0,funded=0,unfunded=0;
+            double initialCorn=0,purchasedCorn=0,remainingCorn=0,initialSoy=0,purchasedSoy=0,remainingSoy=0,transferredCorn=0,transferredSoy=0;
             HashSet<String> certificateKeys=new HashSet<>();
             JSONArray a=sortedPurchases();
             String search=q.getText().toString().trim(),f=from.getText().toString().trim(),t=to.getText().toString().trim();
@@ -497,52 +514,110 @@ public class MainActivity extends Activity {
 
                 shown.add(p);count++;amount+=toLong(p.optString("amount"));
                 long pf=totalFunded(p);funded+=pf;unfunded+=fundingRemaining(p);
-                if(collected){col++;} if(allocated)alloc++; if(fundComplete)fullFund++;
-                if(quotaComplete)fullQuota++;
+                if(collected)col++; if(allocated)alloc++; if(fundComplete)fullFund++; if(quotaComplete)fullQuota++;
 
-                if(!cert.isEmpty() && !isShahedaneh(unit)){
+                if(!cert.isEmpty()){
                     String ck=unit+"|"+cert;
                     if(certificateKeys.add(ck)){
                         JSONObject baseCert=certificateBase(ck,null);
                         if(baseCert!=null){
                             double cq=quotaOriginal(baseCert,"cornQuota"),sq=quotaOriginal(baseCert,"soyQuota");
-                            double tc=transferAmount(unit,cert,"corn"),ts=transferAmount(unit,cert,"soy");
-                            double uc=usedCorn(unit,cert,null),us=usedSoy(unit,cert,null);
-                            double remC=Math.max(0,cq-uc-tc),remS=Math.max(0,sq-us-ts);
-                            initialCorn+=cq; purchasedCorn+=uc; remainingCorn+=remC; transferredCorn+=tc;
-                            initialSoy+=sq; purchasedSoy+=us; remainingSoy+=remS; transferredSoy+=ts;
+                            double remC=Math.max(0,cq-usedCorn(unit,cert,null)-transferAmount(unit,cert,"corn"));
+                            double remS=Math.max(0,sq-usedSoy(unit,cert,null)-transferAmount(unit,cert,"soy"));
+                            initialCorn+=cq;purchasedCorn+=usedCorn(unit,cert,null);remainingCorn+=remC;
+                            initialSoy+=sq;purchasedSoy+=usedSoy(unit,cert,null);remainingSoy+=remS;
+                            transferredCorn+=transferAmount(unit,cert,"corn");transferredSoy+=transferAmount(unit,cert,"soy");
                         }
                     }
                 }
-
-                Button item=btn("🏠 "+unit+" | خرید "+p.optString("purchaseNo")+
-                        "\nگواهی: "+(cert.isEmpty()?"-":cert)+
-                        " | تاریخ: "+p.optString("buyDate")+
-                        "\n"+(collected?"وصول: وصول شده":"وصول: وصول نشده")+
-                        " | "+(allocated?"تخصیص: تخصیص شده":"تخصیص: تخصیص نشده")+
-                        " | "+(fundComplete?"تأمین: کامل":"تأمین: ناقص")+
-                        " | "+(quotaComplete?"سهمیه: کامل":"سهمیه: مانده"));
-                item.setOnClickListener(v->openPage(()->details(p)));list.addView(item);
             }
 
-            summary.setText("خلاصه نتایج نمایش‌داده‌شده\nتعداد: "+count+
-                    " | مبلغ: "+AppData.fmt(""+amount)+" ریال"+
-                    "\nوصول: "+col+" | تخصیص: "+alloc+" | تأمین کامل: "+fullFund+" | سهمیه کامل: "+fullQuota+
-                    "\nمجموع تأمین‌شده: "+AppData.fmt(""+funded)+" ریال"+
-                    "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfunded)+" ریال"+
-                    "\nسهمیه اولیه ذرت: "+fmtDecimal(initialCorn)+" کیلوگرم"+
-                    "\nخرید شده ذرت: "+fmtDecimal(purchasedCorn)+" کیلوگرم"+
-                    "\nذرت انتقال داده: "+fmtDecimal(transferredCorn)+" کیلوگرم"+
-                    "\nمانده سهمیه ذرت: "+fmtDecimal(remainingCorn)+" کیلوگرم"+
-                    "\nسهمیه اولیه سویا: "+fmtDecimal(initialSoy)+" کیلوگرم"+
-                    "\nخرید شده سویا: "+fmtDecimal(purchasedSoy)+" کیلوگرم"+
-                    "\nسویا انتقال داده: "+fmtDecimal(transferredSoy)+" کیلوگرم"+
-                    "\nمانده سهمیه سویا: "+fmtDecimal(remainingSoy)+" کیلوگرم");
+            addSummaryStatRow(summaryGrid,
+                    new String[]{"📄 تعداد خریدها","💰 مبلغ کل","✓ وصول شده","👥 تخصیص شده","✓ تأمین کامل","✓ سهمیه کامل"},
+                    new String[]{""+count,AppData.fmt(""+amount)+" ریال",""+col,""+alloc,""+fullFund,""+fullQuota});
+            addSummaryStatRow(summaryGrid,
+                    new String[]{"💳 مجموع تأمین‌شده","⏳ مجموع تأمین‌نشده","⚖ وزن خریدها"},
+                    new String[]{AppData.fmt(""+funded)+" ریال",AppData.fmt(""+unfunded)+" ریال",fmtDecimal(totalPurchaseWeight(shown))+" کیلوگرم"});
+            addSummaryCommodityRow(summaryGrid,"🌽 ذرت",
+                    new String[]{"سهمیه اولیه","خرید شده","انتقال داده شده","مانده"},
+                    new String[]{fmtDecimal(initialCorn),fmtDecimal(purchasedCorn),fmtDecimal(transferredCorn),fmtDecimal(remainingCorn)});
+            addSummaryCommodityRow(summaryGrid,"🌱 سویا",
+                    new String[]{"سهمیه اولیه","خرید شده","انتقال داده شده","مانده"},
+                    new String[]{fmtDecimal(initialSoy),fmtDecimal(purchasedSoy),fmtDecimal(transferredSoy),fmtDecimal(remainingSoy)});
+            TextView weightSummary=tv(inputWeightSummary(shown),11);
+            weightSummary.setPadding(UiManager.dp(this,8),UiManager.dp(this,8),UiManager.dp(this,8),UiManager.dp(this,8));
+            weightSummary.setGravity(Gravity.RIGHT);weightSummary.setTextColor(UiManager.text(this));
+            summaryGrid.addView(weightSummary,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            addPurchaseTable(list,shown);
         };
         go.setOnClickListener(v->render.run());render.run();
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);
         finishScreen("خریدهای ثبت‌شده");
     }
+
+    void addSummaryStatRow(LinearLayout parent,String[] titles,String[] values){
+        LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);
+        for(int i=titles.length-1;i>=0;i--){
+            LinearLayout cell=summaryCell(titles[i],values[i],false);
+            row.addView(cell,new LinearLayout.LayoutParams(0,UiManager.dp(this,82),1));
+            if(i>0){View divider=new View(this);divider.setBackgroundColor(UiManager.secondary(this));row.addView(divider,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,62)));}
+        }
+        parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,86)));
+    }
+
+    void addSummaryCommodityRow(LinearLayout parent,String title,String[] labels,String[] values){
+        LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout titleCell=summaryCell(title,"",true);row.addView(titleCell,new LinearLayout.LayoutParams(0,UiManager.dp(this,86),1));
+        for(int i=0;i<labels.length;i++){
+            View divider=new View(this);divider.setBackgroundColor(UiManager.secondary(this));row.addView(divider,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,66)));
+            LinearLayout cell=summaryCell(labels[i],values[i]+"\nکیلوگرم",false);row.addView(cell,new LinearLayout.LayoutParams(0,UiManager.dp(this,86),1));
+        }
+        parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,90)));
+    }
+
+    LinearLayout summaryCell(String title,String value,boolean titleOnly){
+        LinearLayout cell=new LinearLayout(this);cell.setOrientation(LinearLayout.VERTICAL);cell.setGravity(Gravity.CENTER);cell.setPadding(UiManager.dp(this,4),UiManager.dp(this,3),UiManager.dp(this,4),UiManager.dp(this,3));
+        TextView t=tv(title,11);t.setGravity(Gravity.CENTER);t.setTextColor(UiManager.text(this));cell.addView(t,new LinearLayout.LayoutParams(-1,0,1));
+        if(!titleOnly){TextView v=tv(value,13);v.setGravity(Gravity.CENTER);v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));v.setTextColor(UiManager.primary(this));cell.addView(v,new LinearLayout.LayoutParams(-1,0,1));}
+        return cell;
+    }
+
+    double totalPurchaseWeight(List<JSONObject> purchases){double s=0;for(JSONObject p:purchases)if(p!=null)s+=toDouble(p.optString("weight"));return s;}
+
+    void addPurchaseTable(LinearLayout list,ArrayList<JSONObject> shown){
+        TextView title=tv("📋  جزئیات خریدهای نمایش‌داده‌شده",16);title.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));title.setTextColor(UiManager.primary(this));addTo(list,title);
+        HorizontalScrollView hsv=new HorizontalScrollView(this);hsv.setFillViewport(true);hsv.setHorizontalScrollBarEnabled(false);
+        TableLayout table=new TableLayout(this);table.setStretchAllColumns(true);table.setShrinkAllColumns(false);table.setPadding(0,UiManager.dp(this,3),0,UiManager.dp(this,3));
+        String[] heads={"ردیف","واحد","گواهی","شماره خرید","تاریخ خرید","وزن","مبلغ کل","پرداخت","عملیات"};
+        TableRow head=new TableRow(this);for(String h:heads)head.addView(tableCell(h,true,false));table.addView(head);
+        for(int i=0;i<shown.size();i++){
+            JSONObject p=shown.get(i);String unit=p.optString("unit",p.optString("buyer"));
+            boolean collected=p.optBoolean("collected"),fundComplete=fundingRemaining(p)<=0;
+            String payment=p.optString("payment","-");String detail=p.optString("paymentDetail","");
+            if(!detail.isEmpty())payment+="\n("+detail+")";
+            TableRow r=new TableRow(this);
+            r.addView(tableCell(""+(i+1),false,false));r.addView(tableCell(unit,false,false));
+            r.addView(tableCell(p.optString("healthCertificate","-"),false,false));r.addView(tableCell(p.optString("purchaseNo","-"),false,false));
+            r.addView(tableCell(p.optString("buyDate","-"),false,false));r.addView(tableCell(fmtDecimal(toDouble(p.optString("weight"))),false,false));
+            r.addView(tableCell(AppData.fmt(p.optString("amount","0")),false,false));
+            TextView pay=tableCell((collected?"پرداخت شده":"در انتظار")+"\\n"+payment,false,collected);r.addView(pay);
+            LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER);actions.setOrientation(LinearLayout.HORIZONTAL);
+            Button view=miniAction("◉");view.setOnClickListener(v->openPage(()->details(p)));actions.addView(view);
+            Button edit=miniAction("✎");edit.setOnClickListener(v->openPage(()->form(p)));actions.addView(edit);
+            Button del=miniAction("🗑");del.setTextColor(Color.rgb(220,50,50));del.setOnClickListener(v->confirmDelete(p));actions.addView(del);r.addView(actions);
+            table.addView(r);
+        }
+        hsv.addView(table,new ViewGroup.LayoutParams(-1,-2));list.addView(hsv,new LinearLayout.LayoutParams(-1,-2));
+    }
+
+    void addTo(LinearLayout parent,View v){parent.addView(v,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));}
+    TextView tableCell(String text,boolean header,boolean success){
+        TextView v=tv(text,header?10:9);v.setGravity(Gravity.CENTER);v.setPadding(UiManager.dp(this,3),UiManager.dp(this,8),UiManager.dp(this,3),UiManager.dp(this,8));
+        GradientDrawable g=new GradientDrawable();g.setColor(header?UiManager.primary(this):UiManager.card(this));g.setStroke(UiManager.dp(this,1),UiManager.secondary(this));g.setCornerRadius(header?UiManager.dp(this,6):0);v.setBackground(g);
+        v.setTextColor(header?Color.WHITE:(success?UiManager.primary(this):UiManager.text(this)));if(success)v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));return v;
+    }
+    Button miniAction(String text){Button b=btn(text);b.setTextSize(12);b.setPadding(0,0,0,0);b.setMinWidth(UiManager.dp(this,30));b.setMinHeight(UiManager.dp(this,34));return b;}
 
     JSONArray sortedPurchases(){JSONArray src=AppData.arr(data,"purchases");ArrayList<JSONObject> l=new ArrayList<>();for(int i=0;i<src.length();i++)l.add(src.optJSONObject(i));Collections.sort(l,(a,b)->b.optString("buyDate").compareTo(a.optString("buyDate")));JSONArray r=new JSONArray();for(JSONObject p:l)r.put(p);return r;}
 
@@ -553,6 +628,7 @@ public class MainActivity extends Activity {
         for(int i=0;i<keys.length;i++)add(tv(labels[i]+": "+p.optString(keys[i],"-"),15));
         add(tv("جزئیات پرداخت: "+p.optString("paymentDetail","-"),15)); if(isShahedaneh(unitName)){add(tv("🔄 منبع سهمیه منتقل‌شده\nواحد مبدأ: "+p.optString("transferSourceUnit","-")+"\nگواهی مبدأ: "+p.optString("transferSourceCertificate",p.optString("healthCertificate","-"))+"\nنوع منشأ: انتقال مانده سهمیه به شاهدانه",15));}
         add(tv("تاریخ ثبت کارت: "+p.optString("cardRegistrationDate",p.optString("cardDate","-")),15));
+        add(tv("نوع نهاده / وزن:\n• "+p.optString("commodity","-")+" : "+fmtDecimal(toDouble(p.optString("weight")))+" کیلوگرم",15));
         String cert=p.optString("healthCertificate");JSONObject cb=certificateBase(unitName+"|"+cert,null);if(cb!=null){double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota"),uc=usedCorn(unitName,cert,null),us=usedSoy(unitName,cert,null),tc=transferAmount(unitName,cert,"corn"),ts=transferAmount(unitName,cert,"soy");add(tv("📌 وضعیت سهمیه این گواهی\nسهمیه اولیه ذرت: "+fmtDecimal(cq)+" کیلوگرم\nخریدشده ذرت: "+fmtDecimal(uc)+" | مانده سهمیه: "+fmtDecimal(Math.max(0,cq-uc-tc))+" کیلوگرم\nذرت منتقل‌شده به شاهدانه: "+fmtDecimal(tc)+" کیلوگرم\nسهمیه اولیه سویا: "+fmtDecimal(sq)+" کیلوگرم\nخریدشده سویا: "+fmtDecimal(us)+" | مانده سهمیه: "+fmtDecimal(Math.max(0,sq-us-ts))+" کیلوگرم\nسویا منتقل‌شده به شاهدانه: "+fmtDecimal(ts)+" کیلوگرم\n"+(isCertificateComplete(unitName,cert)?"✅ تکمیل خرید سهمیه":"⏳ سهمیه هنوز تکمیل نشده است"),15));}
         add(tv("وضعیت وصول: "+(p.optBoolean("collected")?"✅ وصول شد":"⏳ وصول نشده")+
                 (p.optString("collectedDate").isEmpty()?"":" | تاریخ وصول: "+p.optString("collectedDate")),16));
@@ -668,7 +744,7 @@ public class MainActivity extends Activity {
                         double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");
                         double rc=Math.max(0,cq-usedCorn(buyer,cert,null)-transferAmount(buyer,cert,"corn"));
                         double rs=Math.max(0,sq-usedSoy(buyer,cert,null)-transferAmount(buyer,cert,"soy"));
-                        initialCorn+=cq; purchasedCorn+=usedCorn(buyer,cert,null); remainingCorn+=rc; initialSoy+=sq; purchasedSoy+=usedSoy(buyer,cert,null); remainingSoy+=rs;
+                        initialCorn+=cq; purchasedCorn+=usedCorn(buyer,cert,null); transferredCorn+=transferAmount(buyer,cert,"corn"); remainingCorn+=rc; initialSoy+=sq; purchasedSoy+=usedSoy(buyer,cert,null); transferredSoy+=transferAmount(buyer,cert,"soy"); remainingSoy+=rs;
                         boolean complete=rc<=0.0001&&rs<=0.0001;
                         if(complete)fullQuota++;else incompleteCerts.add(cert);
                     }
@@ -686,6 +762,7 @@ public class MainActivity extends Activity {
                 "\nتأمین ناقص: "+(n-fullFund)+" خرید"+
                 "\nمجموع تأمین‌شده: "+AppData.fmt(""+fundedAmt)+" ریال"+
                 "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfundedAmt)+" ریال"+
+                "\n"+inputWeightSummary(purchasesInRange(buyer,"", ""))+
                 "\nسهمیه اولیه ذرت: "+fmtDecimal(initialCorn)+" کیلوگرم"+
                 "\nخرید شده ذرت: "+fmtDecimal(purchasedCorn)+" کیلوگرم"+
                 "\nذرت انتقال داده: "+fmtDecimal(transferredCorn)+" کیلوگرم"+
@@ -749,9 +826,6 @@ public class MainActivity extends Activity {
         LinearLayout dates=new LinearLayout(this);dates.setOrientation(LinearLayout.HORIZONTAL);
         EditText from=new EditText(this),to=new EditText(this);from.setHint("از تاریخ");to.setHint("تا تاریخ");from.setSingleLine(true);to.setSingleLine(true);from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));
         dates.addView(from,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));dates.addView(to,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(dates);
-        Button marlik=btn("🏢 شاهدانه طیور مارلیک");
-        marlik.setOnClickListener(v->openPage(()->shahedanehFile(from.getText().toString().trim(),to.getText().toString().trim())));
-        add(marlik);
         Button show=btn("🔎 نمایش در بازه");add(show);TextView summary=tv("",14);add(summary);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
         Runnable render=()->{list.removeAllViews();int count=0;long total=0,remaining=0;long funded=0;JSONArray a=sortedPurchases();String f=from.getText().toString().trim(),t=to.getText().toString().trim();
             for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null||!filter.accept(p))continue;String d=p.optString("buyDate");if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;count++;long amt=toLong(p.optString("amount"));total+=amt;long rem=fundingRemaining(p);remaining+=rem;funded+=totalFunded(p);String unit=p.optString("unit",p.optString("buyer")),no=p.optString("purchaseNo"),cert=p.optString("healthCertificate");Button b=btn("🏠 "+unit+" | خرید "+no+"\nگواهی: "+(cert.isEmpty()?"-":cert)+" | تاریخ: "+d+"\nمبلغ: "+AppData.fmt(p.optString("amount"))+" ریال");b.setOnClickListener(v->openPage(()->details(p)));list.addView(b);}
@@ -767,12 +841,30 @@ public class MainActivity extends Activity {
         base("خرید بر اساس گواهی بهداشتی");
         LinearLayout dates=new LinearLayout(this);dates.setOrientation(LinearLayout.HORIZONTAL);EditText from=new EditText(this),to=new EditText(this);from.setHint("از تاریخ");to.setHint("تا تاریخ");from.setSingleLine(true);to.setSingleLine(true);from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));dates.addView(from,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));dates.addView(to,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(dates);
         Button show=btn("🔎 نمایش گواهی‌ها در بازه");add(show);TextView summary=tv("",14);add(summary);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
-        Runnable render=()->{list.removeAllViews();int certCount=0;double ic=0,pc=0,rc=0,is=0,ps=0,rs=0;HashSet<String> done=new HashSet<>();String f=from.getText().toString().trim(),t=to.getText().toString().trim();JSONArray a=sortedPurchases();
-            for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String unit=p.optString("unit",p.optString("buyer")).trim(),cert=p.optString("healthCertificate").trim();if(unit.isEmpty()||cert.isEmpty())continue;String d=p.optString("buyDate");if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;String k=unit+"|"+cert;if(!done.add(k))continue;JSONObject cb=certificateBase(k,null);if(cb==null)continue;double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota"),uc=usedCorn(unit,cert,null),us=usedSoy(unit,cert,null),rcc=Math.max(0,cq-uc-transferAmount(unit,cert,"corn")),rss=Math.max(0,sq-us-transferAmount(unit,cert,"soy"));ic+=cq;pc+=uc;rc+=rcc;is+=sq;ps+=us;rs+=rss;certCount++;Button b=btn("🏠 "+unit+"\n📁 گواهی "+cert+"\nمانده ذرت: "+fmtDecimal(rcc)+" | مانده سویا: "+fmtDecimal(rss));b.setOnClickListener(v->openPage(()->certificateFile(unit,cert)));list.addView(b);}
-            summary.setText("آمار کل گواهی‌ها در بازه\nتعداد گواهی: "+certCount+"\nسهمیه اولیه ذرت: "+fmtDecimal(ic)+" کیلوگرم\nخرید شده ذرت: "+fmtDecimal(pc)+" کیلوگرم\nذرت انتقال داده: "+fmtDecimal(ic-pc-rc)+" کیلوگرم\nمانده سهمیه ذرت: "+fmtDecimal(rc)+" کیلوگرم\nسهمیه اولیه سویا: "+fmtDecimal(is)+" کیلوگرم\nخرید شده سویا: "+fmtDecimal(ps)+" کیلوگرم\nسویا انتقال داده: "+fmtDecimal(is-ps-rs)+" کیلوگرم\nمانده سهمیه سویا: "+fmtDecimal(rs)+" کیلوگرم");if(certCount==0)add(tv("هنوز گواهی بهداشتی در این بازه ثبت نشده است.",15));};
+        Runnable render=()->{list.removeAllViews();int certCount=0;double ic=0,pc=0,tc=0,rc=0,is=0,ps=0,ts=0,rs=0;HashSet<String> done=new HashSet<>();String f=from.getText().toString().trim(),t=to.getText().toString().trim();JSONArray a=sortedPurchases();
+            for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String unit=p.optString("unit",p.optString("buyer")).trim(),cert=p.optString("healthCertificate").trim();if(unit.isEmpty()||cert.isEmpty()||isShahedaneh(unit))continue;String d=p.optString("buyDate");if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;String k=unit+"|"+cert;if(!done.add(k))continue;JSONObject cb=certificateBase(k,null);if(cb==null)continue;double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota"),uc=usedCorn(unit,cert,null),us=usedSoy(unit,cert,null),rcc=Math.max(0,cq-uc-transferAmount(unit,cert,"corn")),rss=Math.max(0,sq-us-transferAmount(unit,cert,"soy"));ic+=cq;pc+=uc;tc+=transferAmount(unit,cert,"corn");rc+=rcc;is+=sq;ps+=us;ts+=transferAmount(unit,cert,"soy");rs+=rss;certCount++;Button b=btn("🏠 "+unit+"\n📁 گواهی "+cert+"\nمانده ذرت: "+fmtDecimal(rcc)+" | مانده سویا: "+fmtDecimal(rss));b.setOnClickListener(v->openPage(()->certificateFile(unit,cert)));list.addView(b);}
+            summary.setText("آمار کل گواهی‌ها در بازه\nتعداد گواهی: "+certCount+"\n"+inputWeightSummary(purchasesInRange(null,f,t))+"\nسهمیه اولیه ذرت: "+fmtDecimal(ic)+" کیلوگرم\nخرید شده ذرت: "+fmtDecimal(pc)+" کیلوگرم\nذرت انتقال داده: "+fmtDecimal(ic-pc-rc)+" کیلوگرم\nمانده سهمیه ذرت: "+fmtDecimal(rc)+" کیلوگرم\nسهمیه اولیه سویا: "+fmtDecimal(is)+" کیلوگرم\nخرید شده سویا: "+fmtDecimal(ps)+" کیلوگرم\nسویا انتقال داده: "+fmtDecimal(is-ps-rs)+" کیلوگرم\nمانده سهمیه سویا: "+fmtDecimal(rs)+" کیلوگرم");if(certCount==0)add(tv("هنوز گواهی بهداشتی در این بازه ثبت نشده است.",15));};
         show.setOnClickListener(v->render.run());render.run();Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("خرید بر اساس گواهی بهداشتی");
     }
 
+    String inputWeightSummary(List<JSONObject> purchases){
+        LinkedHashMap<String,Double> sums=new LinkedHashMap<>();
+        for(JSONObject p:purchases){if(p==null)continue;String c=p.optString("commodity").trim();if(c.isEmpty())c="نامشخص";double w=toDouble(p.optString("weight"));sums.put(c,sums.getOrDefault(c,0d)+w);}
+        if(sums.isEmpty())return "نوع نهاده / وزن: موردی ثبت نشده است";
+        StringBuilder b=new StringBuilder("نوع نهاده / وزن:\n");
+        for(Map.Entry<String,Double> e:sums.entrySet())b.append("• ").append(e.getKey()).append(" : ").append(fmtDecimal(e.getValue())).append(" کیلوگرم\n");
+        return b.toString().trim();
+    }
+    List<JSONObject> purchasesInRange(String unit,String from,String to){
+        ArrayList<JSONObject> r=new ArrayList<>();JSONArray a=AppData.arr(data,"purchases");
+        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String u=p.optString("unit",p.optString("buyer")).trim();if(unit!=null&&!unit.equals(u))continue;String d=p.optString("buyDate").trim();if(from!=null&&!from.isEmpty()&&!d.isEmpty()&&d.compareTo(from)<0)continue;if(to!=null&&!to.isEmpty()&&!d.isEmpty()&&d.compareTo(to)>0)continue;r.add(p);}
+        return r;
+    }
+    List<JSONObject> purchasesInRangeForCertificate(String unit,String cert){
+        ArrayList<JSONObject> r=new ArrayList<>();JSONArray a=AppData.arr(data,"purchases");
+        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p!=null&&unit.equals(p.optString("unit",p.optString("buyer")))&&cert.equals(p.optString("healthCertificate")))r.add(p);}
+        return r;
+    }
     JSONArray quotaTransfers(){return AppData.arr(data,"quotaTransfers");}
     String transferCommodityName(String c){return "corn".equals(c)?"ذرت":"سویا";}
     double transferAmount(String unit,String cert,String commodity){
@@ -837,90 +929,39 @@ public class MainActivity extends Activity {
     void quotaTransferPlaceholder(){
         base("انتقال مانده سهمیه به شاهدانه");
         LinearLayout dates=new LinearLayout(this);dates.setOrientation(LinearLayout.HORIZONTAL);EditText from=new EditText(this),to=new EditText(this);from.setHint("از تاریخ");to.setHint("تا تاریخ");from.setSingleLine(true);to.setSingleLine(true);from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));dates.addView(from,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));dates.addView(to,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));add(dates);
-        Button show=btn("🔎 نمایش انتقال‌ها در بازه");add(show);TextView summary=tv("",14);add(summary);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
-        Runnable render=()->{list.removeAllViews();LinkedHashSet<String> units=new LinkedHashSet<>();double tc=0,ts=0;int n=0;String f=from.getText().toString().trim(),t=to.getText().toString().trim();JSONArray tr=quotaTransfers();
-            for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null)continue;String d=x.optString("date").trim();if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;String u=x.optString("unit").trim(),c=x.optString("healthCertificate").trim();if(u.isEmpty()||c.isEmpty())continue;units.add(u);n++;if("corn".equals(x.optString("commodity")))tc+=toDouble(x.optString("amount"));else if("soy".equals(x.optString("commodity")))ts+=toDouble(x.optString("amount"));}
-            for(String u:units){Button b=btn("🏠 "+u+"\n📁 پرونده انتقال‌های سهمیه");b.setOnClickListener(v->openPage(()->transferUnitFile(u,from.getText().toString().trim(),to.getText().toString().trim())));list.addView(b);}
-            summary.setText("آمار کل انتقال در بازه\nتعداد انتقال‌ها: "+n+"\nذرت انتقال داده: "+fmtDecimal(tc)+" کیلوگرم\nسویا انتقال داده: "+fmtDecimal(ts)+" کیلوگرم\nمجموع انتقال سهمیه: "+fmtDecimal(tc+ts)+" کیلوگرم");if(n==0)add(tv("هیچ انتقالی در این بازه ثبت نشده است.",15));};
+        Button marlik=btn("🏢 شاهدانه طیور مارلیک");marlik.setOnClickListener(v->openPage(()->shahedanehFile(from.getText().toString().trim(),to.getText().toString().trim())));add(marlik);
+        Button show=btn("🔎 نمایش گواهی‌های دارای مانده");add(show);TextView summary=tv("",14);add(summary);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
+        Runnable render=()->{list.removeAllViews();LinkedHashSet<String> keys=new LinkedHashSet<>();double tc=0,ts=0;String f=from.getText().toString().trim(),t=to.getText().toString().trim();JSONArray a=sortedPurchases();
+            for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;String unit=p.optString("unit",p.optString("buyer")).trim(),cert=p.optString("healthCertificate").trim(),d=p.optString("buyDate").trim();if(unit.isEmpty()||cert.isEmpty()||isShahedaneh(unit))continue;if(!f.isEmpty()&&!d.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&!d.isEmpty()&&d.compareTo(t)>0)continue;keys.add(unit+"|"+cert);}
+            for(String key:keys){String[] z=key.split("\\|",2);if(z.length!=2)continue;String unit=z[0],cert=z[1];double rc=transferableRemaining(unit,cert,"corn"),rs=transferableRemaining(unit,cert,"soy");if(rc<=0.0001&&rs<=0.0001)continue;Button b=btn("🏠 "+unit+"\n📁 گواهی بهداشتی "+cert+"\nمانده ذرت: "+fmtDecimal(rc)+" | مانده سویا: "+fmtDecimal(rs)+" کیلوگرم");b.setOnClickListener(v->openPage(()->transferCertificateFile(unit,cert,f,t)));list.addView(b);}
+            JSONArray tr=quotaTransfers();for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null)continue;String d=x.optString("date").trim();if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;if("corn".equals(x.optString("commodity")))tc+=toDouble(x.optString("amount"));else if("soy".equals(x.optString("commodity")))ts+=toDouble(x.optString("amount"));}
+            summary.setText("آمار انتقال در بازه\nذرت انتقال داده شده: "+fmtDecimal(tc)+" کیلوگرم\nسویا انتقال داده شده: "+fmtDecimal(ts)+" کیلوگرم");if(list.getChildCount()==0)list.addView(tv("هیچ گواهی با مانده قابل انتقال وجود ندارد.",15));};
         show.setOnClickListener(v->render.run());render.run();Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("انتقال مانده سهمیه به شاهدانه");
     }
-void shahedanehFile(String from,String to){
-        base("شاهدانه طیور مارلیک");
-        String f=from==null?"":from.trim(), t=to==null?"":to.trim();
-        JSONArray tr=quotaTransfers();
-        JSONArray purchases=AppData.arr(data,"purchases");
-        double cornTransfer=0,soyTransfer=0,cornPurchased=0,soyPurchased=0;
-        int transferCount=0,purchaseCount=0;
-        StringBuilder out=new StringBuilder();
-        out.append("سوابق انتقال سهمیه به شاهدانه\n\n");
-        for(int i=0;i<tr.length();i++){
-            JSONObject x=tr.optJSONObject(i);if(x==null)continue;
-            String d=x.optString("date").trim();
-            if(!f.isEmpty()&&d.compareTo(f)<0)continue;
-            if(!t.isEmpty()&&d.compareTo(t)>0)continue;
-            double a=toDouble(x.optString("amount"));
-            String com=x.optString("commodity");
-            if("corn".equals(com)){cornTransfer+=a;out.append("🌽 ذرت: ").append(fmtDecimal(a));}
-            else if("soy".equals(com)){soyTransfer+=a;out.append("🌱 سویا: ").append(fmtDecimal(a));}
-            else continue;
-            out.append(" کیلوگرم | از واحد: ").append(x.optString("unit","-"))
-               .append(" | گواهی: ").append(x.optString("healthCertificate","-"))
-               .append(" | تاریخ: ").append(d).append("\n");
-            transferCount++;
-        }
-        if(transferCount==0)out.append("هنوز انتقال سهمیه‌ای ثبت نشده است.\n");
-        out.append("\nسوابق خرید با سهمیه منتقل‌شده\n\n");
-        for(int i=0;i<purchases.length();i++){
-            JSONObject p=purchases.optJSONObject(i);if(p==null||!isShahedaneh(p.optString("unit",p.optString("buyer"))))continue;
-            String d=p.optString("buyDate").trim();
-            if(!f.isEmpty()&&!d.isEmpty()&&d.compareTo(f)<0)continue;
-            if(!t.isEmpty()&&!d.isEmpty()&&d.compareTo(t)>0)continue;
-            double c=toDouble(p.optString("corn")),s=toDouble(p.optString("soy"));
-            cornPurchased+=c;soyPurchased+=s;purchaseCount++;
-            out.append("📄 خرید ").append(p.optString("purchaseNo","-"))
-               .append(" | تاریخ: ").append(d)
-               .append(" | واحد مبدأ: ").append(p.optString("transferSourceUnit","-"))
-               .append(" | گواهی مبدأ: ").append(p.optString("transferSourceCertificate",p.optString("healthCertificate","-")))
-               .append("\nذرت مصرفی: ").append(fmtDecimal(c)).append(" | سویا مصرفی: ").append(fmtDecimal(s)).append(" کیلوگرم\n");
-        }
-        if(purchaseCount==0)out.append("هنوز خریدی با سهمیه منتقل‌شده ثبت نشده است.\n");
-        out.append("\nآمار شاهدانه طیور مارلیک در بازه\n")
-           .append("تعداد انتقال: ").append(transferCount)
-           .append("\nذرت انتقال داده شده: ").append(fmtDecimal(cornTransfer)).append(" کیلوگرم")
-           .append("\nسویا انتقال داده شده: ").append(fmtDecimal(soyTransfer)).append(" کیلوگرم")
-           .append("\nذرت مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(cornPurchased)).append(" کیلوگرم")
-           .append("\nسویا مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(soyPurchased)).append(" کیلوگرم")
-           .append("\nمانده سهمیه انتقالی ذرت: ").append(fmtDecimal(Math.max(0,cornTransfer-cornPurchased))).append(" کیلوگرم")
-           .append("\nمانده سهمیه انتقالی سویا: ").append(fmtDecimal(Math.max(0,soyTransfer-soyPurchased))).append(" کیلوگرم");
-        add(tv(out.toString(),15));
-        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("شاهدانه طیور مارلیک");
+
+    void shahedanehFile(String from,String to){
+        base("شاهدانه طیور مارلیک");String f=from==null?"":from.trim(),t=to==null?"":to.trim();JSONArray tr=quotaTransfers(),purchases=AppData.arr(data,"purchases");double cornTransfer=0,soyTransfer=0,cornPurchased=0,soyPurchased=0;int transferCount=0,purchaseCount=0;StringBuilder out=new StringBuilder("سوابق انتقال سهمیه به شاهدانه\n\n");
+        for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null)continue;String d=x.optString("date").trim();if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;double a=toDouble(x.optString("amount"));if("corn".equals(x.optString("commodity"))){cornTransfer+=a;out.append("🌽 ذرت: ").append(fmtDecimal(a));}else if("soy".equals(x.optString("commodity"))){soyTransfer+=a;out.append("🌱 سویا: ").append(fmtDecimal(a));}else continue;transferCount++;out.append(" کیلوگرم | از واحد: ").append(x.optString("unit","-")).append(" | گواهی: ").append(x.optString("healthCertificate","-")).append(" | تاریخ: ").append(d).append("\n");}
+        out.append("سوابق خرید با سهمیه منتقل‌شده\n");for(int i=0;i<purchases.length();i++){JSONObject p=purchases.optJSONObject(i);if(p==null||!isShahedaneh(p.optString("unit",p.optString("buyer"))))continue;String d=p.optString("buyDate").trim();if(!f.isEmpty()&&d.compareTo(f)<0)continue;if(!t.isEmpty()&&d.compareTo(t)>0)continue;double c=toDouble(p.optString("corn")),s=toDouble(p.optString("soy"));if(c<=0&&s<=0)continue;cornPurchased+=c;soyPurchased+=s;purchaseCount++;out.append("📄 خرید ").append(p.optString("purchaseNo","-")).append(" | تاریخ: ").append(d).append(" | واحد مبدأ: ").append(p.optString("transferSourceUnit","-")).append(" | گواهی مبدأ: ").append(p.optString("transferSourceCertificate",p.optString("healthCertificate","-"))).append("\nذرت مصرفی: ").append(fmtDecimal(c)).append(" | سویا مصرفی: ").append(fmtDecimal(s)).append(" کیلوگرم\n");}
+        if(purchaseCount==0)out.append("هنوز خریدی با سهمیه منتقل‌شده ثبت نشده است.\n");out.append("\nنوع نهاده / وزن در خریدهای مارلیک:\n").append(inputWeightSummary(purchasesInRange("شاهدانه طیور مارلیک",f,t)));out.append("\n\nآمار شاهدانه طیور مارلیک در بازه\nتعداد انتقال: ").append(transferCount).append("\nذرت انتقال داده شده: ").append(fmtDecimal(cornTransfer)).append(" کیلوگرم").append("\nسویا انتقال داده شده: ").append(fmtDecimal(soyTransfer)).append(" کیلوگرم").append("\nذرت مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(cornPurchased)).append(" کیلوگرم").append("\nسویا مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(soyPurchased)).append(" کیلوگرم").append("\nمانده سهمیه انتقالی ذرت: ").append(fmtDecimal(Math.max(0,cornTransfer-cornPurchased))).append(" کیلوگرم").append("\nمانده سهمیه انتقالی سویا: ").append(fmtDecimal(Math.max(0,soyTransfer-soyPurchased))).append(" کیلوگرم");
+        add(tv(out.toString(),15));Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("شاهدانه طیور مارلیک");
     }
 
-    void transferUnitFile(String unit,String from,String to){
-        base("پرونده انتقال: "+unit);LinkedHashSet<String> certs=new LinkedHashSet<>();JSONArray tr=quotaTransfers();for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null||!unit.equals(x.optString("unit")))continue;String d=x.optString("date");if(!from.isEmpty()&&d.compareTo(from)<0)continue;if(!to.isEmpty()&&d.compareTo(to)>0)continue;String c=x.optString("healthCertificate").trim();if(!c.isEmpty())certs.add(c);}if(certs.isEmpty())add(tv("برای این واحد انتقالی در بازه انتخاب‌شده وجود ندارد.",15));for(String c:certs){Button b=btn("📁 گواهی بهداشتی "+c);b.setOnClickListener(v->openPage(()->transferCertificateFile(unit,c,from,to)));add(b);}Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده انتقال");
-    }
     void transferCertificateFile(String unit,String cert,String from,String to){
         base("گواهی انتقال: "+cert);
-        double initialCorn=0,initialSoy=0;int n=0;JSONArray tr=quotaTransfers();StringBuilder out=new StringBuilder();
+        JSONObject cb=certificateBase(unit+"|"+cert,null);
+        double cq=cb==null?0:quotaOriginal(cb,"cornQuota"),sq=cb==null?0:quotaOriginal(cb,"soyQuota");
+        double uc=usedCorn(unit,cert,null),us=usedSoy(unit,cert,null),tc=transferAmount(unit,cert,"corn"),ts=transferAmount(unit,cert,"soy");
+        double rc=Math.max(0,cq-uc-tc),rs=Math.max(0,sq-us-ts);
+        JSONArray tr=quotaTransfers();StringBuilder out=new StringBuilder();
         out.append("واحد مبدأ: ").append(unit).append("\nگواهی بهداشتی: ").append(cert).append("\n\nسابقه انتقال‌ها:\n");
-        for(int i=0;i<tr.length();i++){
-            JSONObject x=tr.optJSONObject(i);if(x==null||!unit.equals(x.optString("unit"))||!cert.equals(x.optString("healthCertificate")))continue;
-            double a=toDouble(x.optString("amount"));
-            if("corn".equals(x.optString("commodity")))initialCorn+=a;else if("soy".equals(x.optString("commodity")))initialSoy+=a;
-            String d=x.optString("date");if(!from.isEmpty()&&d.compareTo(from)<0)continue;if(!to.isEmpty()&&d.compareTo(to)>0)continue;
-            if("corn".equals(x.optString("commodity")))out.append("ذرت: ").append(fmtDecimal(a));else if("soy".equals(x.optString("commodity")))out.append("سویا: ").append(fmtDecimal(a));
-            else continue;
-            out.append(" کیلوگرم | تاریخ: ").append(d).append("\n");n++;
-        }
-        out.append("\nسهمیه اولیه ذرت: ").append(fmtDecimal(initialCorn)).append(" کیلوگرم")
-           .append("\nخرید شده ذرت: 0 کیلوگرم")
-           .append("\nذرت انتقال داده: ").append(fmtDecimal(initialCorn)).append(" کیلوگرم")
-           .append("\nمانده سهمیه ذرت: 0 کیلوگرم")
-           .append("\nسهمیه اولیه سویا: ").append(fmtDecimal(initialSoy)).append(" کیلوگرم")
-           .append("\nخرید شده سویا: 0 کیلوگرم")
-           .append("\nسویا انتقال داده: ").append(fmtDecimal(initialSoy)).append(" کیلوگرم")
-           .append("\nمانده سهمیه سویا: 0 کیلوگرم");
-        add(tv(out.toString(),15));Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده گواهی انتقال");
+        for(int i=0;i<tr.length();i++){JSONObject x=tr.optJSONObject(i);if(x==null||!unit.equals(x.optString("unit"))||!cert.equals(x.optString("healthCertificate")))continue;String d=x.optString("date");if(!from.isEmpty()&&d.compareTo(from)<0)continue;if(!to.isEmpty()&&d.compareTo(to)>0)continue;double a=toDouble(x.optString("amount"));if("corn".equals(x.optString("commodity")))out.append("ذرت: ").append(fmtDecimal(a));else if("soy".equals(x.optString("commodity")))out.append("سویا: ").append(fmtDecimal(a));else continue;out.append(" کیلوگرم | تاریخ: ").append(d).append("\n");}
+        out.append("\nنوع نهاده / وزن:\n").append(inputWeightSummary(purchasesInRangeForCertificate(unit,cert)));
+        out.append("\nسهمیه اولیه ذرت: ").append(fmtDecimal(cq)).append(" کیلوگرم").append("\nذرت خرید شده: ").append(fmtDecimal(uc)).append(" کیلوگرم").append("\nذرت انتقال داده: ").append(fmtDecimal(tc)).append(" کیلوگرم").append("\nمانده سهمیه ذرت: ").append(fmtDecimal(rc)).append(" کیلوگرم").append("\nسهمیه اولیه سویا: ").append(fmtDecimal(sq)).append(" کیلوگرم").append("\nسویا خرید شده: ").append(fmtDecimal(us)).append(" کیلوگرم").append("\nسویا انتقال داده: ").append(fmtDecimal(ts)).append(" کیلوگرم").append("\nمانده سهمیه سویا: ").append(fmtDecimal(rs)).append(" کیلوگرم");
+        add(tv(out.toString(),15));
+        if(rc>0.0001){Button b=btn("⬆ انتقال مانده ذرت به شاهدانه");b.setOnClickListener(v->transferDialog(unit,cert,"corn",rc));add(b);}
+        if(rs>0.0001){Button b=btn("⬆ انتقال مانده سویا به شاهدانه");b.setOnClickListener(v->transferDialog(unit,cert,"soy",rs));add(b);}
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("پرونده گواهی انتقال");
     }
 
     void transferDialog(String unit,String cert,String commodity,double max){
@@ -963,6 +1004,7 @@ void shahedanehFile(String from,String to){
                 "\nتعداد جوجه‌ریزی: "+cb.optString("chickCount")+
                 "\nتاریخ جوجه‌ریزی: "+cb.optString("placementDate")+
                 "\nتاریخ اعتبار: "+cb.optString("quotaExpiry"),15));
+        add(tv(inputWeightSummary(purchasesInRangeForCertificate(unit,cert)),15));
         double tc=transferAmount(unit,cert,"corn"),ts=transferAmount(unit,cert,"soy"); double tcr=transferRemaining(unit,cert,"corn"),tsr=transferRemaining(unit,cert,"soy");
         add(tv("وضعیت سهمیه\nذرت — اولیه: "+fmtDecimal(cq)+" | مصرف‌شده: "+fmtDecimal(uc)+" | مانده: "+fmtDecimal(rc)+
                 "\nذرت منتقل‌شده به شاهدانه: "+fmtDecimal(tc)+" کیلوگرم | مصرف‌شده از انتقال: "+fmtDecimal(Math.max(0,tc-tcr))+" | مانده انتقال: "+fmtDecimal(tcr)+
@@ -1051,6 +1093,7 @@ void shahedanehFile(String from,String to){
                     "\nسهمیه: "+qf+" گواهی کامل"+
                     "\nمجموع تأمین‌شده: "+AppData.fmt(""+funded)+" ریال"+
                     "\nمجموع تأمین‌نشده: "+AppData.fmt(""+unfunded)+" ریال"+
+                    "\n"+inputWeightSummary(purchasesInRange(buyer,f.getText().toString(),t.getText().toString()))+
                     "\nسهمیه اولیه ذرت: "+fmtDecimal(initialCorn)+" کیلوگرم"+
                     "\nخرید شده ذرت: "+fmtDecimal(purchasedCorn)+" کیلوگرم"+
                     "\nذرت انتقال داده: "+fmtDecimal(transferredCorn)+" کیلوگرم"+
@@ -1146,88 +1189,19 @@ void shahedanehFile(String from,String to){
     void addEntry(String key,String title,Runnable after){EditText e=new EditText(this);new AlertDialog.Builder(this).setTitle(title).setView(e).setPositiveButton("ذخیره",(d,w)->{try{String v=e.getText().toString().trim();if(v.isEmpty())return;JSONArray a=AppData.arr(data,key);for(int i=0;i<a.length();i++)if(v.equals(a.optString(i)))return;a.put(v);data.put(key,a);AppData.save(this,data);after.run();}catch(Exception ignored){}}).setNegativeButton("لغو",null).show();}
 
     void reports(){
-        base("گزارش‌ها و آمار");
-
-        LinearLayout searchCard=reportCard();
-        TextView st=tv("جستجو و فیلتر گزارش",18);st.setTypeface(Typeface.DEFAULT,Typeface.BOLD);st.setTextColor(UiManager.primary(this));searchCard.addView(st,wrapLp());
-
-        EditText cert=inputIn(searchCard,"شماره گواهی بهداشتی");
-        EditText purchaseNo=inputIn(searchCard,"شماره خرید");
-        EditText unitSearch=inputIn(searchCard,"نام واحد");
-        LinearLayout dates=new LinearLayout(this);dates.setOrientation(LinearLayout.HORIZONTAL);dates.setPadding(0,UiManager.dp(this,4),0,UiManager.dp(this,4));
-        EditText from=inputIn(dates,"از تاریخ");EditText to=inputIn(dates,"تا تاریخ");from.setFocusable(false);to.setFocusable(false);from.setOnClickListener(v->pickDate(from));to.setOnClickListener(v->pickDate(to));
-        searchCard.addView(dates,wrapLp());
-
-        Spinner unitSpR=reportSpinner(searchCard,"نام واحد",reportUnits());
-        Spinner companySpR=reportSpinner(searchCard,"شرکت",reportCompanies());
-        Spinner commoditySpR=reportSpinner(searchCard,"نهاده",reportCommodities());
-        Spinner paymentSpR=reportSpinner(searchCard,"نوع پرداخت",new String[]{"همه","توافقی","نقد"});
-        Spinner collectSp=reportSpinner(searchCard,"وصول",new String[]{"همه","وصول شده","وصول نشده"});
-        Spinner allocSp=reportSpinner(searchCard,"تخصیص",new String[]{"همه","تخصیص شده","تخصیص نشده"});
-        Spinner fundSp=reportSpinner(searchCard,"تأمین",new String[]{"همه","تأمین کامل","تأمین ناقص"});
-        Spinner quotaSp=reportSpinner(searchCard,"سهمیه",new String[]{"همه","تکمیل شده","دارای مانده"});
-
-        Button show=btn("🔎 نمایش گزارش");show.setTextSize(UiManager.buttonSize(this));show.setTypeface(Typeface.DEFAULT,Typeface.BOLD);show.setTextColor(Color.WHITE);show.setBackground(reportRounded(UiManager.primary(this),12));searchCard.addView(show,wrapLp());
-        root.addView(searchCard,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        LinearLayout summaryCard=reportCard();TextView summaryTitle=tv("خلاصه گزارش",18);summaryTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD);summaryTitle.setTextColor(UiManager.primary(this));summaryCard.addView(summaryTitle,wrapLp());
-        TextView summary=tv("برای نمایش گزارش، فیلترها را انتخاب کنید.",15);summaryCard.addView(summary,wrapLp());root.addView(summaryCard,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        TextView tableTitle=tv("جزئیات خریدها",18);tableTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD);tableTitle.setTextColor(UiManager.text(this));add(tableTitle);
-        HorizontalScrollView hsv=new HorizontalScrollView(this);hsv.setFillViewport(false);LinearLayout tableHolder=new LinearLayout(this);tableHolder.setOrientation(LinearLayout.VERTICAL);hsv.addView(tableHolder);add(hsv);
-
-        Runnable render=()->{
-            tableHolder.removeAllViews();
-            String cs=cert.getText().toString().trim(), ps=purchaseNo.getText().toString().trim(), us=unitSearch.getText().toString().trim();
-            String f=from.getText().toString().trim(),t=to.getText().toString().trim();
-            String selectedUnit=String.valueOf(unitSpR.getSelectedItem()), selectedCompany=String.valueOf(companySpR.getSelectedItem()), selectedCommodity=String.valueOf(commoditySpR.getSelectedItem()), selectedPayment=String.valueOf(paymentSpR.getSelectedItem());
-            JSONArray all=sortedPurchases(), rows=new JSONArray();
-            double totalWeight=0,totalAmount=0,cornPurchased=0,soyPurchased=0,cornInitial=0,soyInitial=0,cornTransferred=0,soyTransferred=0,cornRemaining=0,soyRemaining=0;int count=0;
-            for(int i=0;i<all.length();i++){
-                JSONObject p=all.optJSONObject(i);if(p==null)continue;
-                String unit=p.optString("unit",p.optString("buyer")), certV=p.optString("healthCertificate"), purchaseV=p.optString("purchaseNo"), date=p.optString("buyDate"), company=p.optString("company"), commodity=p.optString("commodity"), payment=p.optString("payment");
-                if(!cs.isEmpty()&&!certV.contains(cs))continue;if(!ps.isEmpty()&&!purchaseV.contains(ps))continue;if(!us.isEmpty()&&!unit.contains(us))continue;
-                if(!"همه".equals(selectedUnit)&&!selectedUnit.equals(unit))continue;if(!"همه".equals(selectedCompany)&&!selectedCompany.equals(company))continue;if(!"همه".equals(selectedCommodity)&&!selectedCommodity.equals(commodity))continue;if(!"همه".equals(selectedPayment)&&!selectedPayment.equals(payment))continue;
-                if(!f.isEmpty()&&!date.isEmpty()&&date.compareTo(f)<0)continue;if(!t.isEmpty()&&!date.isEmpty()&&date.compareTo(t)>0)continue;
-                boolean collected=p.optBoolean("collected",false),allocated=p.optBoolean("allocated",false),fundComplete=fundingRemaining(p)<=0.0001;
-                if(collectSp.getSelectedItemPosition()==1&&!collected||collectSp.getSelectedItemPosition()==2&&collected)continue;
-                if(allocSp.getSelectedItemPosition()==1&&!allocated||allocSp.getSelectedItemPosition()==2&&allocated)continue;
-                if(fundSp.getSelectedItemPosition()==1&&!fundComplete||fundSp.getSelectedItemPosition()==2&&fundComplete)continue;
-                JSONObject cb=certV.isEmpty()?null:certificateBase(unit+"|"+certV,null);double cq=cb==null?0:quotaOriginal(cb,"cornQuota"),sq=cb==null?0:quotaOriginal(cb,"soyQuota");double uc=certV.isEmpty()?0:usedCorn(unit,certV,null),uu=certV.isEmpty()?0:usedSoy(unit,certV,null);double ct=certV.isEmpty()?0:transferAmount(unit,certV,"corn"),stt=certV.isEmpty()?0:transferAmount(unit,certV,"soy");double cr=Math.max(0,cq-uc-ct),sr=Math.max(0,sq-uu-stt);boolean quotaComplete=cq>0&&sq>0&&cr<=0.0001&&sr<=0.0001;
-                if(quotaSp.getSelectedItemPosition()==1&&!quotaComplete||quotaSp.getSelectedItemPosition()==2&&quotaComplete)continue;
-                rows.put(p);count++;totalWeight+=toDouble(p.optString("weight"));totalAmount+=toDouble(p.optString("amount"));cornPurchased+=toDouble(p.optString("corn"));soyPurchased+=toDouble(p.optString("soy"));
-            }
-            LinkedHashSet<String> statCerts=new LinkedHashSet<>();
-            for(int i=0;i<rows.length();i++){JSONObject p=rows.optJSONObject(i);if(p==null)continue;String u=p.optString("unit",p.optString("buyer")),c=p.optString("healthCertificate").trim();if(c.isEmpty())continue;statCerts.add(u+"|"+c);}
-            for(String key:statCerts){String[] parts=key.split("\\|",2);String u=parts.length>0?parts[0]:"",c=parts.length>1?parts[1]:"";JSONObject cb=certificateBase(key,null);double cq=cb==null?0:quotaOriginal(cb,"cornQuota"),sq=cb==null?0:quotaOriginal(cb,"soyQuota");double uc=usedCorn(u,c,null),uu=usedSoy(u,c,null),ct=transferAmount(u,c,"corn"),stt=transferAmount(u,c,"soy");cornInitial+=cq;soyInitial+=sq;cornTransferred+=ct;soyTransferred+=stt;cornRemaining+=Math.max(0,cq-uc-ct);soyRemaining+=Math.max(0,sq-uu-stt);}
-            summary.setText("تعداد خریدها: "+count+"\nمجموع وزن: "+fmtDecimal(totalWeight)+" کیلوگرم\nمجموع مبلغ: "+AppData.fmt(fmtDecimal(totalAmount))+" ریال\n\n"+
-                    "سهمیه اولیه ذرت: "+fmtDecimal(cornInitial)+" | ذرت خرید شده: "+fmtDecimal(cornPurchased)+" | ذرت انتقال داده شده: "+fmtDecimal(cornTransferred)+" | مانده ذرت: "+fmtDecimal(cornRemaining)+" کیلوگرم\n"+
-                    "سهمیه اولیه سویا: "+fmtDecimal(soyInitial)+" | سویا خرید شده: "+fmtDecimal(soyPurchased)+" | سویا انتقال داده شده: "+fmtDecimal(soyTransferred)+" | مانده سویا: "+fmtDecimal(soyRemaining)+" کیلوگرم");
-            String[] headers={"واحد","گواهی بهداشتی","شماره خرید","تاریخ خرید","نهاده","وزن","ذرت","سویا","نوع پرداخت","نام شرکت","وصول","تخصیص","تأمین"};
-            TableLayout table=new TableLayout(this);table.setStretchAllColumns(false);table.setShrinkAllColumns(false);table.setBackgroundColor(UiManager.background(this));
-            TableRow hr=new TableRow(this);for(String h:headers)hr.addView(reportCell(h,true));table.addView(hr);
-            for(int i=0;i<rows.length();i++){JSONObject p=rows.optJSONObject(i);if(p==null)continue;String[] vals={p.optString("unit",p.optString("buyer")),p.optString("healthCertificate"),p.optString("purchaseNo"),p.optString("buyDate"),p.optString("commodity"),fmtDecimal(toDouble(p.optString("weight"))),fmtDecimal(toDouble(p.optString("corn"))),fmtDecimal(toDouble(p.optString("soy"))),p.optString("payment"),p.optString("company"),p.optBoolean("collected")?"وصول شده":"وصول نشده",p.optBoolean("allocated")?"تخصیص شده":"تخصیص نشده",fundingRemaining(p)<=0.0001?"کامل":"ناقص"};TableRow tr=new TableRow(this);for(String v:vals)tr.addView(reportCell(v,false));table.addView(tr);}
-            tableHolder.addView(table,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT));
-            if(rows.length()==0){TextView empty=tv("موردی مطابق فیلترهای انتخاب‌شده پیدا نشد.",15);empty.setGravity(Gravity.CENTER);tableHolder.addView(empty,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));}
-            show.setText("✓ گزارش نمایش داده شد ("+count+" خرید)");
-        };
-        show.setOnClickListener(v->render.run());render.run();
-        Button ex=btn("📊 خروجی Excel گزارش");ex.setOnClickListener(v->exportFilteredReport(cert,purchaseNo,unitSearch,from,to,unitSpR,companySpR,commoditySpR,paymentSpR,collectSp,allocSp,fundSp,quotaSp));add(ex);
-        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("گزارش‌ها و آمار");
+        base("گزارش‌ها و خروجی Excel");EditText q=input("جستجوی خریدار، شرکت یا شماره خرید");Button b=btn("🔎 جستجو");add(b);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
+        Runnable render=()->{list.removeAllViews();String s=q.getText().toString().trim();TreeSet<String> buyers=new TreeSet<>(),companies=new TreeSet<>();JSONArray a=sortedPurchases();for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);String blob=p.optString("unit",p.optString("buyer"))+" "+p.optString("company")+" "+p.optString("purchaseNo");if(s.isEmpty()||blob.contains(s)){buyers.add(p.optString("unit",p.optString("buyer")));companies.add(p.optString("company"));}}for(String x:buyers){Button z=btn("👤 "+x);z.setOnClickListener(vv->openPage(()->reportSelection("خریدار: "+x,"buyer",x)));list.addView(z);}for(String x:companies){Button z=btn("🏢 "+x);z.setOnClickListener(vv->openPage(()->reportSelection("شرکت: "+x,"company",x)));list.addView(z);}};
+        b.setOnClickListener(v->render.run());render.run();add(tv("ابتدا خریدار یا شرکت را انتخاب کنید؛ سپس خریدها را تیک بزنید و خروجی بگیرید.",13));Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("گزارش‌ها و خروجی Excel");
     }
-
-    LinearLayout reportCard(){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(UiManager.dp(this,10),UiManager.dp(this,8),UiManager.dp(this,10),UiManager.dp(this,8));c.setBackground(reportRounded(UiManager.card(this),14));return c;}
-    LinearLayout.LayoutParams wrapLp(){return new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT);}
-    GradientDrawable reportRounded(int color,int radius){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(UiManager.dp(this,radius));g.setStroke(UiManager.dp(this,1),UiManager.secondary(this));return g;}
-    EditText inputIn(LinearLayout parent,String hint){EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));e.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);e.setPadding(UiManager.dp(this,12),UiManager.dp(this,8),UiManager.dp(this,12),UiManager.dp(this,8));e.setBackground(reportRounded(UiManager.background(this),10));parent.addView(e,wrapLp());return e;}
-    Spinner reportSpinner(LinearLayout parent,String hint,String[] values){TextView l=tv(hint,13);l.setTextColor(UiManager.textSecondary(this));parent.addView(l,wrapLp());Spinner s=spinner(values);parent.addView(s,wrapLp());return s;}
-    String[] reportUnits(){LinkedHashSet<String>x=new LinkedHashSet<>();x.add("همه");JSONArray a=AppData.arr(data,"units");for(int i=0;i<a.length();i++)if(!a.optString(i).trim().isEmpty())x.add(a.optString(i));return x.toArray(new String[0]);}
-    String[] reportCompanies(){LinkedHashSet<String>x=new LinkedHashSet<>();x.add("همه");JSONArray a=AppData.arr(data,"companies");for(int i=0;i<a.length();i++)if(!a.optString(i).trim().isEmpty())x.add(a.optString(i));x.add("شرکت طیور مارلیک");return x.toArray(new String[0]);}
-    String[] reportCommodities(){LinkedHashSet<String>x=new LinkedHashSet<>();x.add("همه");JSONArray a=AppData.arr(data,"commodities");for(int i=0;i<a.length();i++)if(!a.optString(i).trim().isEmpty())x.add(a.optString(i));return x.toArray(new String[0]);}
-    TextView reportCell(String value,boolean header){TextView v=tv(value,header?13:12);v.setGravity(Gravity.CENTER);v.setTextColor(header?Color.WHITE:UiManager.text(this));v.setTypeface(Typeface.DEFAULT,header?Typeface.BOLD:Typeface.NORMAL);v.setPadding(UiManager.dp(this,8),UiManager.dp(this,8),UiManager.dp(this,8),UiManager.dp(this,8));v.setMinWidth(UiManager.dp(this,110));GradientDrawable g=new GradientDrawable();g.setColor(header?UiManager.primary(this):UiManager.card(this));g.setStroke(UiManager.dp(this,1),UiManager.secondary(this));v.setBackground(g);return v;}
-    void exportFilteredReport(EditText cert,EditText purchaseNo,EditText unitSearch,EditText from,EditText to,Spinner unit,Spinner company,Spinner commodity,Spinner payment,Spinner collect,Spinner alloc,Spinner fund,Spinner quota){
-        JSONArray all=sortedPurchases(),out=new JSONArray();String cs=cert.getText().toString().trim(),ps=purchaseNo.getText().toString().trim(),us=unitSearch.getText().toString().trim(),f=from.getText().toString().trim(),t=to.getText().toString().trim();String su=String.valueOf(unit.getSelectedItem()),sc=String.valueOf(company.getSelectedItem()),sco=String.valueOf(commodity.getSelectedItem()),sp=String.valueOf(payment.getSelectedItem());
-        for(int i=0;i<all.length();i++){JSONObject p=all.optJSONObject(i);if(p==null)continue;String u=p.optString("unit",p.optString("buyer")),c=p.optString("healthCertificate"),n=p.optString("purchaseNo"),d=p.optString("buyDate");if(!cs.isEmpty()&&!c.contains(cs)||!ps.isEmpty()&&!n.contains(ps)||!us.isEmpty()&&!u.contains(us))continue;if(!"همه".equals(su)&&!su.equals(u)||!"همه".equals(sc)&&!sc.equals(p.optString("company"))||!"همه".equals(sco)&&!sco.equals(p.optString("commodity"))||!"همه".equals(sp)&&!sp.equals(p.optString("payment")))continue;if(!f.isEmpty()&&!d.isEmpty()&&d.compareTo(f)<0||!t.isEmpty()&&!d.isEmpty()&&d.compareTo(t)>0)continue;boolean col=p.optBoolean("collected"),al=p.optBoolean("allocated"),fc=fundingRemaining(p)<=0.0001;if(collect.getSelectedItemPosition()==1&&!col||collect.getSelectedItemPosition()==2&&col||alloc.getSelectedItemPosition()==1&&!al||alloc.getSelectedItemPosition()==2&&al||fund.getSelectedItemPosition()==1&&!fc||fund.getSelectedItemPosition()==2&&fc)continue;String certV=p.optString("healthCertificate"),uu=p.optString("unit",p.optString("buyer"));JSONObject cb=certV.isEmpty()?null:certificateBase(uu+"|"+certV,null);double cq=cb==null?0:quotaOriginal(cb,"cornQuota"),sq=cb==null?0:quotaOriginal(cb,"soyQuota");double cr=Math.max(0,cq-(certV.isEmpty()?0:usedCorn(uu,certV,null))-(certV.isEmpty()?0:transferAmount(uu,certV,"corn"))),sr=Math.max(0,sq-(certV.isEmpty()?0:usedSoy(uu,certV,null))-(certV.isEmpty()?0:transferAmount(uu,certV,"soy")));boolean qok=cq>0&&sq>0&&cr<=0.0001&&sr<=0.0001;if(quota.getSelectedItemPosition()==1&&!qok||quota.getSelectedItemPosition()==2&&qok)continue;out.put(p);}exportExcel(out,"report_filtered");
+    void reportSelection(String title,String filterKey,String filterVal){
+        base(title);EditText q=input("");q.setHint("جستجو: شماره خرید / تاریخ / نام");LinearLayout dates=new LinearLayout(this);EditText f=new EditText(this);f.setHint("از تاریخ");f.setSingleLine(true);EditText t=new EditText(this);t.setHint("تا تاریخ");t.setSingleLine(true);f.setOnClickListener(v->pickDate(f));t.setOnClickListener(v->pickDate(t));dates.addView(f,new LinearLayout.LayoutParams(0,60,1));dates.addView(t,new LinearLayout.LayoutParams(0,60,1));add(dates);
+        LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);ArrayList<CheckBox> checks=new ArrayList<>();ArrayList<JSONObject> objs=new ArrayList<>();JSONArray a=sortedPurchases();
+        for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(!filterVal.equals(p.optString(filterKey)))continue;CheckBox c=new CheckBox(this);c.setText("خرید "+p.optString("purchaseNo")+" | "+p.optString("buyDate")+" | "+AppData.fmt(p.optString("amount")));styleReportCheck(c);checks.add(c);objs.add(p);list.addView(c);}
+        Button filter=btn("🔎 اعمال فیلتر");filter.setOnClickListener(v->{String s=q.getText().toString().trim();for(int i=0;i<checks.size();i++){JSONObject p=objs.get(i);String blob=p.optString("purchaseNo")+" "+p.optString("buyDate")+" "+p.optString("buyer")+" "+p.optString("company");boolean ok=s.isEmpty()||blob.contains(s);if(!f.getText().toString().isEmpty()&&p.optString("buyDate").compareTo(f.getText().toString())<0)ok=false;if(!t.getText().toString().isEmpty()&&p.optString("buyDate").compareTo(t.getText().toString())>0)ok=false;checks.get(i).setVisibility(ok?View.VISIBLE:View.GONE);}});add(filter);
+        Button all=btn("☑ انتخاب همه موارد نمایش‌داده‌شده");all.setOnClickListener(v->{boolean select=false;for(CheckBox c:checks)if(c.getVisibility()==View.VISIBLE&&!c.isChecked()){select=true;break;}for(CheckBox c:checks)if(c.getVisibility()==View.VISIBLE)c.setChecked(select);all.setText(select?"☐ لغو انتخاب همه موارد":"☑ انتخاب همه موارد نمایش‌داده‌شده");});add(all);
+        for(CheckBox c:checks){c.setOnCheckedChangeListener((v,checked)->{if(Build.VERSION.SDK_INT>=21)v.setBackgroundColor(checked?UiManager.secondary(this):Color.TRANSPARENT);boolean anyVisible=false,allVisibleChecked=true;for(CheckBox x:checks)if(x.getVisibility()==View.VISIBLE){anyVisible=true;if(!x.isChecked())allVisibleChecked=false;}all.setText(anyVisible&&allVisibleChecked?"☐ لغو انتخاب همه موارد":"☑ انتخاب همه موارد نمایش‌داده‌شده");});}
+        Button ex=btn("📊 خروجی Excel موارد انتخاب‌شده");ex.setOnClickListener(v->{JSONArray r=new JSONArray();for(int i=0;i<checks.size();i++)if(checks.get(i).isChecked()&&checks.get(i).getVisibility()==View.VISIBLE)r.put(objs.get(i));if(r.length()==0){for(int i=0;i<checks.size();i++)if(checks.get(i).getVisibility()==View.VISIBLE)r.put(objs.get(i));}exportExcel(r,"report_"+safe(filterVal));});add(ex);
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen(title);for(CheckBox c:checks)styleReportCheck(c);
     }
     void styleReportCheck(CheckBox c){c.setTextColor(UiManager.text(this));c.setTextSize(UiManager.bodySize(this));c.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);c.setPadding(UiManager.dp(this,10),UiManager.dp(this,8),UiManager.dp(this,10),UiManager.dp(this,8));if(Build.VERSION.SDK_INT>=21){int[][] states={{android.R.attr.state_checked},{-android.R.attr.state_checked}};int[] colors={UiManager.primary(this),Color.GRAY};c.setButtonTintList(new ColorStateList(states,colors));}c.setOnCheckedChangeListener((b,checked)->{if(Build.VERSION.SDK_INT>=21){b.setBackgroundColor(checked?UiManager.secondary(this):Color.TRANSPARENT);}});}
     String safe(String s){return s.replaceAll("[\\\\/:*?\"<>|]","_");}
