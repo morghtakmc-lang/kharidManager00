@@ -556,68 +556,137 @@ public class MainActivity extends Activity {
         finishScreen("خریدهای ثبت‌شده");
     }
 
+    int screenWidthDp(){
+        return Math.max(320,Math.round(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density));
+    }
+
+    int summaryColumnCount(){
+        return screenWidthDp()>=600?3:2;
+    }
+
     void addSummaryStatRow(LinearLayout parent,String[] titles,String[] values){
-        LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);
-        for(int i=titles.length-1;i>=0;i--){
-            LinearLayout cell=summaryCell(titles[i],values[i],false);
-            row.addView(cell,new LinearLayout.LayoutParams(0,UiManager.dp(this,82),1));
-            if(i>0){View divider=new View(this);divider.setBackgroundColor(UiManager.secondary(this));row.addView(divider,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,62)));}
+        // Responsive: phones use 2 columns, wider screens use 3.
+        int cols=summaryColumnCount();
+        for(int start=0;start<titles.length;start+=cols){
+            LinearLayout row=new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            int end=Math.min(start+cols,titles.length);
+            int count=end-start;
+            for(int i=start;i<end;i++){
+                LinearLayout cell=summaryCell(titles[i],values[i],false);
+                row.addView(cell,new LinearLayout.LayoutParams(0,UiManager.dp(this,82),1));
+                if(i<end-1){
+                    View divider=new View(this);divider.setBackgroundColor(UiManager.secondary(this));
+                    row.addView(divider,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,62)));
+                }
+            }
+            for(int i=count;i<cols;i++){
+                View spacer=new View(this);row.addView(spacer,new LinearLayout.LayoutParams(0,UiManager.dp(this,82),1));
+            }
+            parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,84)));
         }
-        parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,86)));
     }
 
     void addSummaryCommodityRow(LinearLayout parent,String title,String[] labels,String[] values){
-        LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout titleCell=summaryCell(title,"",true);row.addView(titleCell,new LinearLayout.LayoutParams(0,UiManager.dp(this,86),1));
-        for(int i=0;i<labels.length;i++){
-            View divider=new View(this);divider.setBackgroundColor(UiManager.secondary(this));row.addView(divider,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,66)));
-            LinearLayout cell=summaryCell(labels[i],values[i]+"\nکیلوگرم",false);row.addView(cell,new LinearLayout.LayoutParams(0,UiManager.dp(this,86),1));
+        TextView heading=tv(title,15);
+        heading.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        heading.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));
+        heading.setTextColor(UiManager.primary(this));
+        heading.setPadding(UiManager.dp(this,8),UiManager.dp(this,6),UiManager.dp(this,8),UiManager.dp(this,6));
+        parent.addView(heading,new LinearLayout.LayoutParams(-1,UiManager.dp(this,42)));
+
+        int cols=summaryColumnCount();
+        for(int start=0;start<labels.length;start+=cols){
+            LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);
+            int end=Math.min(start+cols,labels.length);int count=end-start;
+            for(int i=start;i<end;i++){
+                LinearLayout cell=summaryCell(labels[i],values[i]+"\nکیلوگرم",false);
+                row.addView(cell,new LinearLayout.LayoutParams(0,UiManager.dp(this,80),1));
+                if(i<end-1){
+                    View divider=new View(this);divider.setBackgroundColor(UiManager.secondary(this));
+                    row.addView(divider,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,60)));
+                }
+            }
+            for(int i=count;i<cols;i++){
+                View spacer=new View(this);row.addView(spacer,new LinearLayout.LayoutParams(0,UiManager.dp(this,80),1));
+            }
+            parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,82)));
         }
-        parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,90)));
     }
 
     LinearLayout summaryCell(String title,String value,boolean titleOnly){
-        LinearLayout cell=new LinearLayout(this);cell.setOrientation(LinearLayout.VERTICAL);cell.setGravity(Gravity.CENTER);cell.setPadding(UiManager.dp(this,4),UiManager.dp(this,3),UiManager.dp(this,4),UiManager.dp(this,3));
-        TextView t=tv(title,11);t.setGravity(Gravity.CENTER);t.setTextColor(UiManager.text(this));cell.addView(t,new LinearLayout.LayoutParams(-1,0,1));
-        if(!titleOnly){TextView v=tv(value,13);v.setGravity(Gravity.CENTER);v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));v.setTextColor(UiManager.primary(this));cell.addView(v,new LinearLayout.LayoutParams(-1,0,1));}
+        LinearLayout cell=new LinearLayout(this);cell.setOrientation(LinearLayout.VERTICAL);cell.setGravity(Gravity.CENTER);
+        cell.setPadding(UiManager.dp(this,6),UiManager.dp(this,5),UiManager.dp(this,6),UiManager.dp(this,5));
+        TextView t=tv(title,11);t.setGravity(Gravity.CENTER);t.setMaxLines(2);t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        t.setTextColor(UiManager.text(this));cell.addView(t,new LinearLayout.LayoutParams(-1,0,1));
+        if(!titleOnly){
+            TextView v=tv(value,14);v.setGravity(Gravity.CENTER);v.setMaxLines(2);v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));v.setTextColor(UiManager.primary(this));
+            cell.addView(v,new LinearLayout.LayoutParams(-1,0,1));
+        }
         return cell;
     }
 
     double totalPurchaseWeight(List<JSONObject> purchases){double s=0;for(JSONObject p:purchases)if(p!=null)s+=toDouble(p.optString("weight"));return s;}
 
     void addPurchaseTable(LinearLayout list,ArrayList<JSONObject> shown){
-        TextView title=tv("📋  جزئیات خریدهای نمایش‌داده‌شده",16);title.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));title.setTextColor(UiManager.primary(this));addTo(list,title);
-        HorizontalScrollView hsv=new HorizontalScrollView(this);hsv.setFillViewport(true);hsv.setHorizontalScrollBarEnabled(false);
-        TableLayout table=new TableLayout(this);table.setStretchAllColumns(true);table.setShrinkAllColumns(false);table.setPadding(0,UiManager.dp(this,3),0,UiManager.dp(this,3));
+        TextView title=tv("📋  جزئیات خریدهای نمایش‌داده‌شده",16);
+        title.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));title.setTextColor(UiManager.primary(this));addTo(list,title);
+
+        HorizontalScrollView hsv=new HorizontalScrollView(this);
+        hsv.setFillViewport(false);
+        hsv.setHorizontalScrollBarEnabled(true);
+        hsv.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        hsv.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        hsv.setPadding(0,0,0,UiManager.dp(this,4));
+
+        TableLayout table=new TableLayout(this);
+        table.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        table.setStretchAllColumns(false);table.setShrinkAllColumns(false);
+        table.setPadding(0,UiManager.dp(this,3),0,UiManager.dp(this,3));
+
         String[] heads={"ردیف","واحد","گواهی","شماره خرید","تاریخ خرید","وزن","مبلغ کل","پرداخت","عملیات"};
-        TableRow head=new TableRow(this);for(String h:heads)head.addView(tableCell(h,true,false));table.addView(head);
+        // Keep the table readable on every phone; it scrolls horizontally instead of squeezing columns.
+        int[] widths={58,130,120,110,112,88,130,125,140};
+        TableRow head=new TableRow(this);
+        for(int i=0;i<heads.length;i++)head.addView(tableCell(heads[i],true,false),new TableRow.LayoutParams(UiManager.dp(this,widths[i]),UiManager.dp(this,58)));
+        table.addView(head);
+
         for(int i=0;i<shown.size();i++){
             JSONObject p=shown.get(i);String unit=p.optString("unit",p.optString("buyer"));
-            boolean collected=p.optBoolean("collected"),fundComplete=fundingRemaining(p)<=0;
+            boolean collected=p.optBoolean("collected");
             String payment=p.optString("payment","-");String detail=p.optString("paymentDetail","");
             if(!detail.isEmpty())payment+="\n("+detail+")";
             TableRow r=new TableRow(this);
-            r.addView(tableCell(""+(i+1),false,false));r.addView(tableCell(unit,false,false));
-            r.addView(tableCell(p.optString("healthCertificate","-"),false,false));r.addView(tableCell(p.optString("purchaseNo","-"),false,false));
-            r.addView(tableCell(p.optString("buyDate","-"),false,false));r.addView(tableCell(fmtDecimal(toDouble(p.optString("weight"))),false,false));
-            r.addView(tableCell(AppData.fmt(p.optString("amount","0")),false,false));
-            TextView pay=tableCell((collected?"پرداخت شده":"در انتظار")+"\\n"+payment,false,collected);r.addView(pay);
+            String[] vals={""+(i+1),unit,p.optString("healthCertificate","-"),p.optString("purchaseNo","-"),
+                    p.optString("buyDate","-"),fmtDecimal(toDouble(p.optString("weight"))),
+                    AppData.fmt(p.optString("amount","0")),(collected?"پرداخت شده":"در انتظار")+"\n"+payment};
+            for(int c=0;c<vals.length;c++)r.addView(tableCell(vals[c],false,collected&&c==7),new TableRow.LayoutParams(UiManager.dp(this,widths[c]),UiManager.dp(this,72)));
+
             LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER);actions.setOrientation(LinearLayout.HORIZONTAL);
-            Button view=miniAction("◉");view.setOnClickListener(v->openPage(()->details(p)));actions.addView(view);
-            Button edit=miniAction("✎");edit.setOnClickListener(v->openPage(()->form(p)));actions.addView(edit);
-            Button del=miniAction("🗑");del.setTextColor(Color.rgb(220,50,50));del.setOnClickListener(v->confirmDelete(p));actions.addView(del);r.addView(actions);
+            Button view=miniAction("◉");view.setContentDescription("مشاهده");view.setOnClickListener(v->openPage(()->details(p)));actions.addView(view);
+            Button edit=miniAction("✎");edit.setContentDescription("ویرایش");edit.setOnClickListener(v->openPage(()->form(p)));actions.addView(edit);
+            Button del=miniAction("🗑");del.setContentDescription("حذف");del.setTextColor(Color.rgb(220,50,50));del.setOnClickListener(v->confirmDelete(p));actions.addView(del);
+            r.addView(actions,new TableRow.LayoutParams(UiManager.dp(this,widths[8]),UiManager.dp(this,72)));
             table.addView(r);
         }
-        hsv.addView(table,new ViewGroup.LayoutParams(-1,-2));list.addView(hsv,new LinearLayout.LayoutParams(-1,-2));
+
+        int tableWidth=0;for(int w:widths)tableWidth+=w;
+        hsv.addView(table,new ViewGroup.LayoutParams(UiManager.dp(this,tableWidth),-2));
+        list.addView(hsv,new LinearLayout.LayoutParams(-1,-2));
+        // RTL keeps the first logical columns on the right; do not force a device-dependent scroll offset.
     }
 
     void addTo(LinearLayout parent,View v){parent.addView(v,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));}
     TextView tableCell(String text,boolean header,boolean success){
-        TextView v=tv(text,header?10:9);v.setGravity(Gravity.CENTER);v.setPadding(UiManager.dp(this,3),UiManager.dp(this,8),UiManager.dp(this,3),UiManager.dp(this,8));
+        TextView v=tv(text,header?11:10);v.setGravity(Gravity.CENTER);v.setMaxLines(4);v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        v.setPadding(UiManager.dp(this,5),UiManager.dp(this,8),UiManager.dp(this,5),UiManager.dp(this,8));
         GradientDrawable g=new GradientDrawable();g.setColor(header?UiManager.primary(this):UiManager.card(this));g.setStroke(UiManager.dp(this,1),UiManager.secondary(this));g.setCornerRadius(header?UiManager.dp(this,6):0);v.setBackground(g);
-        v.setTextColor(header?Color.WHITE:(success?UiManager.primary(this):UiManager.text(this)));if(success)v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));return v;
+        v.setTextColor(header?Color.WHITE:(success?UiManager.primary(this):UiManager.text(this)));
+        if(success)v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));return v;
     }
-    Button miniAction(String text){Button b=btn(text);b.setTextSize(12);b.setPadding(0,0,0,0);b.setMinWidth(UiManager.dp(this,30));b.setMinHeight(UiManager.dp(this,34));return b;}
+    Button miniAction(String text){Button b=btn(text);b.setTextSize(12);b.setPadding(0,0,0,0);b.setMinWidth(UiManager.dp(this,30));b.setMinHeight(UiManager.dp(this,36));return b;}
 
     JSONArray sortedPurchases(){JSONArray src=AppData.arr(data,"purchases");ArrayList<JSONObject> l=new ArrayList<>();for(int i=0;i<src.length();i++)l.add(src.optJSONObject(i));Collections.sort(l,(a,b)->b.optString("buyDate").compareTo(a.optString("buyDate")));JSONArray r=new JSONArray();for(JSONObject p:l)r.put(p);return r;}
 
