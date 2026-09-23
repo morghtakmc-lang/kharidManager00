@@ -852,9 +852,7 @@ void shahedanehFile(String from,String to){
         double cornTransfer=0,soyTransfer=0,cornPurchased=0,soyPurchased=0;
         int transferCount=0,purchaseCount=0;
         StringBuilder out=new StringBuilder();
-        out.append("سوابق انتقال سهمیه به شاهدانه
-
-");
+        out.append("سوابق انتقال سهمیه به شاهدانه\n\n");
         for(int i=0;i<tr.length();i++){
             JSONObject x=tr.optJSONObject(i);if(x==null)continue;
             String d=x.optString("date").trim();
@@ -867,16 +865,11 @@ void shahedanehFile(String from,String to){
             else continue;
             out.append(" کیلوگرم | از واحد: ").append(x.optString("unit","-"))
                .append(" | گواهی: ").append(x.optString("healthCertificate","-"))
-               .append(" | تاریخ: ").append(d).append("
-");
+               .append(" | تاریخ: ").append(d).append("\n");
             transferCount++;
         }
-        if(transferCount==0)out.append("هنوز انتقال سهمیه‌ای ثبت نشده است.
-");
-        out.append("
-سوابق خرید با سهمیه منتقل‌شده
-
-");
+        if(transferCount==0)out.append("هنوز انتقال سهمیه‌ای ثبت نشده است.\n");
+        out.append("\nسوابق خرید با سهمیه منتقل‌شده\n\n");
         for(int i=0;i<purchases.length();i++){
             JSONObject p=purchases.optJSONObject(i);if(p==null||!isShahedaneh(p.optString("unit",p.optString("buyer"))))continue;
             String d=p.optString("buyDate").trim();
@@ -888,28 +881,17 @@ void shahedanehFile(String from,String to){
                .append(" | تاریخ: ").append(d)
                .append(" | واحد مبدأ: ").append(p.optString("transferSourceUnit","-"))
                .append(" | گواهی مبدأ: ").append(p.optString("transferSourceCertificate",p.optString("healthCertificate","-")))
-               .append("
-ذرت مصرفی: ").append(fmtDecimal(c)).append(" | سویا مصرفی: ").append(fmtDecimal(s)).append(" کیلوگرم
-");
+               .append("\nذرت مصرفی: ").append(fmtDecimal(c)).append(" | سویا مصرفی: ").append(fmtDecimal(s)).append(" کیلوگرم\n");
         }
-        if(purchaseCount==0)out.append("هنوز خریدی با سهمیه منتقل‌شده ثبت نشده است.
-");
-        out.append("
-آمار شاهدانه طیور مارلیک در بازه
-")
+        if(purchaseCount==0)out.append("هنوز خریدی با سهمیه منتقل‌شده ثبت نشده است.\n");
+        out.append("\nآمار شاهدانه طیور مارلیک در بازه\n")
            .append("تعداد انتقال: ").append(transferCount)
-           .append("
-ذرت انتقال داده شده: ").append(fmtDecimal(cornTransfer)).append(" کیلوگرم")
-           .append("
-سویا انتقال داده شده: ").append(fmtDecimal(soyTransfer)).append(" کیلوگرم")
-           .append("
-ذرت مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(cornPurchased)).append(" کیلوگرم")
-           .append("
-سویا مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(soyPurchased)).append(" کیلوگرم")
-           .append("
-مانده سهمیه انتقالی ذرت: ").append(fmtDecimal(Math.max(0,cornTransfer-cornPurchased))).append(" کیلوگرم")
-           .append("
-مانده سهمیه انتقالی سویا: ").append(fmtDecimal(Math.max(0,soyTransfer-soyPurchased))).append(" کیلوگرم");
+           .append("\nذرت انتقال داده شده: ").append(fmtDecimal(cornTransfer)).append(" کیلوگرم")
+           .append("\nسویا انتقال داده شده: ").append(fmtDecimal(soyTransfer)).append(" کیلوگرم")
+           .append("\nذرت مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(cornPurchased)).append(" کیلوگرم")
+           .append("\nسویا مصرف‌شده از سهمیه انتقالی: ").append(fmtDecimal(soyPurchased)).append(" کیلوگرم")
+           .append("\nمانده سهمیه انتقالی ذرت: ").append(fmtDecimal(Math.max(0,cornTransfer-cornPurchased))).append(" کیلوگرم")
+           .append("\nمانده سهمیه انتقالی سویا: ").append(fmtDecimal(Math.max(0,soyTransfer-soyPurchased))).append(" کیلوگرم");
         add(tv(out.toString(),15));
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("شاهدانه طیور مارلیک");
     }
