@@ -203,6 +203,8 @@ public class MainActivity extends Activity {
         days.addTextChangedListener(aw);time.addTextChangedListener(aw);inputs.get(18).addTextChangedListener(aw);
         Button clear=btn("🔕 حذف هشدار");clear.setOnClickListener(v->{days.setText("");time.setText("");updateAlarmStatus(preview,"","",inputs.get(18).getText().toString());if(old!=null){try{old.remove("alarm");old.remove("alarmRepeat");}catch(Exception ignored){}cancelAlarm(this,old);}});add(clear);
         Button save=btn("✓ ذخیره خرید و هشدار");save.setOnClickListener(v->savePurchase(old,days.getText().toString(),time.getText().toString(),repeat.getSelectedItemPosition()==1,save));add(save);
+        LinearLayout linkedCard=chainLinkedUnitsCard(p.optString("purchaseNo"));
+        if(linkedCard!=null)add(linkedCard);
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);
         finishScreen(old==null?"ثبت خرید جدید":"ویرایش خرید");
         updateAlarmStatus(preview,days.getText().toString(),time.getText().toString(),inputs.get(18).getText().toString());setupValidationListeners(save);validateForm(save);
@@ -1453,6 +1455,92 @@ public class MainActivity extends Activity {
     }
     void addStatsText(LinearLayout grid,String title,String value){
         addSummaryPair(grid,title,value,"","");
+    }
+
+
+    // ارتباط خرید زنجیره با چند واحد زیرمجموعه
+    void saveChainPurchaseLinks(String purchaseNo, String chainName, JSONArray links){
+        try{
+            android.content.SharedPreferences sp=getSharedPreferences("chain_purchase_links",MODE_PRIVATE);
+            JSONArray all;
+            try{ all=new JSONArray(sp.getString("items","[]")); }catch(Exception e){ all=new JSONArray(); }
+            for(int i=0;i<links.length();i++){
+                JSONObject link=links.optJSONObject(i);
+                if(link==null)continue;
+                link.put("purchaseNo",purchaseNo);
+                link.put("chainName",chainName);
+                all.put(link);
+            }
+            sp.edit().putString("items",all.toString()).apply();
+        }catch(Exception ignored){}
+    }
+
+    JSONArray getChainPurchaseLinks(String purchaseNo){
+        JSONArray out=new JSONArray();
+        try{
+            android.content.SharedPreferences sp=getSharedPreferences("chain_purchase_links",MODE_PRIVATE);
+            JSONArray all=new JSONArray(sp.getString("items","[]"));
+            for(int i=0;i<all.length();i++){
+                JSONObject x=all.optJSONObject(i);
+                if(x!=null && purchaseNo.equals(x.optString("purchaseNo"))) out.put(x);
+            }
+        }catch(Exception ignored){}
+        return out;
+    }
+
+    JSONArray getSubUnitPurchaseLinks(String unitName){
+        JSONArray out=new JSONArray();
+        try{
+            android.content.SharedPreferences sp=getSharedPreferences("chain_purchase_links",MODE_PRIVATE);
+            JSONArray all=new JSONArray(sp.getString("items","[]"));
+            for(int i=0;i<all.length();i++){
+                JSONObject x=all.optJSONObject(i);
+                if(x!=null && unitName.equals(x.optString("unitName"))) out.put(x);
+            }
+        }catch(Exception ignored){}
+        return out;
+    }
+
+    double chainLinkedQuantity(String unitName){
+        double sum=0;
+        JSONArray a=getSubUnitPurchaseLinks(unitName);
+        for(int i=0;i<a.length();i++){
+            JSONObject x=a.optJSONObject(i);
+            if(x!=null) sum+=toDouble(x.optString("quantity"));
+        }
+        return sum;
+    }
+
+    String chainLinksSummary(String purchaseNo){
+        JSONArray a=getChainPurchaseLinks(purchaseNo);
+        if(a.length()==0)return "";
+        StringBuilder s=new StringBuilder("واحدهای مرتبط: ");
+        for(int i=0;i<a.length();i++){
+            JSONObject x=a.optJSONObject(i);
+            if(x==null)continue;
+            if(i>0)s.append(" | ");
+            s.append(x.optString("unitName","-"))
+             .append(" — گواهی ").append(x.optString("certificateNo","-"))
+             .append(" — ").append(x.optString("quantity","0")).append(" کیلوگرم");
+        }
+        return s.toString();
+    }
+
+    LinearLayout chainLinkedUnitsCard(String purchaseNo){
+        JSONArray a=getChainPurchaseLinks(purchaseNo);
+        if(a.length()==0)return null;
+        LinearLayout card=statsCard("واحدهای زیرمجموعه مرتبط با این خرید");
+        LinearLayout grid=statsGrid(card);
+        for(int i=0;i<a.length();i++){
+            JSONObject x=a.optJSONObject(i);
+            if(x==null)continue;
+            addSummaryPair(grid,
+                "🏠 "+x.optString("unitName","-"),
+                "گواهی "+x.optString("certificateNo","-"),
+                "⚖️ مقدار",
+                x.optString("quantity","0")+" کیلوگرم");
+        }
+        return card;
     }
 
 }
