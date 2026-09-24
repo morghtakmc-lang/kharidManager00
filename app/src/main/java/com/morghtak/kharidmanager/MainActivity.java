@@ -690,16 +690,16 @@ public class MainActivity extends Activity {
         TextView info=tv("ساختار واحدها را از طریق دو بخش زیر مدیریت کنید.",14);
         info.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);add(info);
 
-        Button chain=btn("🏢  زنجیره تک طیور مارلیک گیلان\nواحد اصلی / مبنا");
+        Button chain=btn("🏢  زنجیره تک طیور مارلیک گیلان");
         chain.setOnClickListener(v->openPage(()->unitGroupPage(true)));
         add(chain);
 
-        Button independent=btn("🏠  واحدهای مستقل\nواحدهای خارج از زنجیره");
+        Button independent=btn("🏠  واحدهای مستقل");
         independent.setOnClickListener(v->openPage(()->unitGroupPage(false)));
         add(independent);
 
         // واحد قدیمی «شاهدانه طیور مارلیک» و منطق قبلی آن حفظ می‌شود.
-        Button shahedaneh=btn("🏢  شاهدانه طیور مارلیک\nواحد موجود / دارای سوابق قبلی");
+        Button shahedaneh=btn("🏢  شاهدانه طیور مارلیک");
         shahedaneh.setOnClickListener(v->openPage(()->buyerFile(SHAHEDANEH_UNIT)));
         add(shahedaneh);
 
@@ -734,7 +734,7 @@ public class MainActivity extends Activity {
                     continue;
                 }
                 if(!s.isEmpty()&&!name.contains(s))continue;
-                Button x=btn((chain?"↳ ":"🏠 ")+name);
+                Button x=btn("🏠 "+name);
                 x.setOnClickListener(v->openPage(()->buyerFile(name)));
                 list.addView(x);visible++;
             }
