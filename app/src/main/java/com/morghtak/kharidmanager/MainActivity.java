@@ -21,6 +21,7 @@ import java.util.*;
 
 public class MainActivity extends Activity {
     static final String SHAHEDANEH_UNIT = "شاهدانه طیور مارلیک";
+    static final String ZANJIREH_UNIT = "زنجیره تک طیور مارلیک گیلان";
     LinearLayout root;
     JSONObject data;
     ArrayList<EditText> inputs = new ArrayList<>();
@@ -61,7 +62,7 @@ public class MainActivity extends Activity {
             if(!data.has("quotaTransfers")){data.put("quotaTransfers",new JSONArray());changed=true;}
             JSONArray oldUnits=data.has("units")?data.optJSONArray("units"):null;
             if(oldUnits==null){oldUnits=new JSONArray();JSONArray oldBuyers=AppData.arr(data,"buyers");for(int i=0;i<oldBuyers.length();i++)oldUnits.put(oldBuyers.optString(i));data.put("units",oldUnits);changed=true;}
-            boolean hasSpecial=false;for(int i=0;i<oldUnits.length();i++)if(SHAHEDANEH_UNIT.equals(oldUnits.optString(i))){hasSpecial=true;break;}if(!hasSpecial){oldUnits.put(SHAHEDANEH_UNIT);changed=true;}
+            if(ensureUnitGroups(oldUnits))changed=true;
             for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p==null)continue;if(!p.has("unit")&&p.has("buyer")){p.put("unit",p.optString("buyer"));changed=true;}if(!p.has("healthCertificate")){p.put("healthCertificate","");changed=true;}if(!p.has("chickCount")){p.put("chickCount","");changed=true;}if(!p.has("cornQuota")){p.put("cornQuota","");changed=true;}if(!p.has("soyQuota")){p.put("soyQuota","");changed=true;}if(!p.has("placementDate")){p.put("placementDate","");changed=true;}if(!p.has("quotaExpiry")){p.put("quotaExpiry","");changed=true;}if(!p.has("cardRegistrationDate")){p.put("cardRegistrationDate","");changed=true;}if(!p.has("paymentDetail")){p.put("paymentDetail","");changed=true;}if(!p.has("allocatedDate")){p.put("allocatedDate","");changed=true;}}
             if(changed)AppData.save(this,data);
         }catch(Exception ignored){}
@@ -531,52 +532,32 @@ public class MainActivity extends Activity {
 
     void addSummaryPair(LinearLayout parent,String title1,String value1,String title2,String value2){
         LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0,0,0,UiManager.dp(this,1));
         LinearLayout c1=summaryMetric(title1,value1),c2=summaryMetric(title2,value2);
-        row.addView(c1,new LinearLayout.LayoutParams(0,UiManager.dp(this,76),1));
-        View divider=new View(this);divider.setBackgroundColor(Color.argb(55,0,120,105));
-        row.addView(divider,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,58)));
-        row.addView(c2,new LinearLayout.LayoutParams(0,UiManager.dp(this,76),1));
-        parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,77)));
+        row.addView(c1,new LinearLayout.LayoutParams(0,-2,1));
+        View divider=new View(this);divider.setBackgroundColor(UiManager.secondary(this));row.addView(divider,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,64)));
+        row.addView(c2,new LinearLayout.LayoutParams(0,-2,1));
+        parent.addView(row,new LinearLayout.LayoutParams(-1,-2));
     }
 
     LinearLayout summaryMetric(String title,String value){
-        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setGravity(Gravity.CENTER);
-        box.setPadding(UiManager.dp(this,5),UiManager.dp(this,5),UiManager.dp(this,5),UiManager.dp(this,5));
-        TextView t=tv(title,11);t.setGravity(Gravity.CENTER);t.setTextColor(UiManager.text(this));t.setMaxLines(2);t.setEllipsize(null);
-        TextView v=tv(value,15);v.setGravity(Gravity.CENTER);v.setTextColor(UiManager.primary(this));v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));v.setMaxLines(2);v.setEllipsize(null);
-        box.addView(t,new LinearLayout.LayoutParams(-1,UiManager.dp(this,30)));
-        box.addView(v,new LinearLayout.LayoutParams(-1,UiManager.dp(this,30)));
-        return box;
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setGravity(Gravity.CENTER);box.setPadding(UiManager.dp(this,8),UiManager.dp(this,10),UiManager.dp(this,8),UiManager.dp(this,10));
+        TextView t=tv(title,12);t.setGravity(Gravity.CENTER);t.setTextColor(UiManager.text(this));t.setMaxLines(2);
+        TextView v=tv(value,16);v.setGravity(Gravity.CENTER);v.setTextColor(UiManager.primary(this));v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));v.setMaxLines(2);
+        box.addView(t,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));box.addView(v,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));return box;
     }
 
     void addSummaryCommodity(LinearLayout parent,String title,String[] labels,String[] values){
-        TextView heading=tv(title,14);heading.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));heading.setTextColor(UiManager.text(this));
-        heading.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);heading.setPadding(UiManager.dp(this,8),UiManager.dp(this,5),UiManager.dp(this,8),UiManager.dp(this,2));
+        TextView heading=tv(title,15);heading.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));heading.setTextColor(UiManager.primary(this));heading.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);heading.setPadding(UiManager.dp(this,8),UiManager.dp(this,8),UiManager.dp(this,8),UiManager.dp(this,4));
         parent.addView(heading,new LinearLayout.LayoutParams(-1,UiManager.dp(this,42)));
-
-        // Four compact cells on wider screens; two-by-two on narrow phones.
-        int widthDp=getResources().getConfiguration().screenWidthDp;
-        if(widthDp>=520){
-            LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);
-            for(int i=0;i<4;i++){
-                LinearLayout c=summaryMetric(labels[i],values[i]+"\nکیلوگرم");
-                row.addView(c,new LinearLayout.LayoutParams(0,UiManager.dp(this,76),1));
-                if(i<3){View d=new View(this);d.setBackgroundColor(Color.argb(55,0,120,105));row.addView(d,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,58)));}
-            }
-            parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,77)));
-        }else{
-            for(int r=0;r<2;r++){
-                LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);
-                for(int i=r*2;i<r*2+2;i++){
-                    LinearLayout c=summaryMetric(labels[i],values[i]+"\nکیلوگرم");
-                    row.addView(c,new LinearLayout.LayoutParams(0,UiManager.dp(this,76),1));
-                    if(i==r*2){View d=new View(this);d.setBackgroundColor(Color.argb(55,0,120,105));row.addView(d,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,58)));}
-                }
-                parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,77)));
-            }
+        LinearLayout row1=new LinearLayout(this);row1.setOrientation(LinearLayout.HORIZONTAL);LinearLayout row2=new LinearLayout(this);row2.setOrientation(LinearLayout.HORIZONTAL);
+        for(int i=0;i<2;i++){
+            LinearLayout c=summaryMetric(labels[i],values[i]+"\nکیلوگرم");row1.addView(c,new LinearLayout.LayoutParams(0,-2,1));
+            LinearLayout c2=summaryMetric(labels[i+2],values[i+2]+"\nکیلوگرم");row2.addView(c2,new LinearLayout.LayoutParams(0,-2,1));
         }
+        addSummaryDivider(row1);addSummaryDivider(row2);parent.addView(row1,new LinearLayout.LayoutParams(-1,-2));parent.addView(row2,new LinearLayout.LayoutParams(-1,-2));
     }
+
+    void addSummaryDivider(LinearLayout row){View divider=new View(this);divider.setBackgroundColor(UiManager.secondary(this));row.addView(divider,1,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,58)));}
 
     double totalPurchaseWeight(List<JSONObject> purchases){double s=0;for(JSONObject p:purchases)if(p!=null)s+=toDouble(p.optString("weight"));return s;}
 
@@ -599,10 +580,7 @@ public class MainActivity extends Activity {
             Button del=miniAction("🗑");del.setContentDescription("حذف");del.setTextColor(Color.rgb(220,50,50));del.setOnClickListener(v->confirmDelete(p));actions.addView(del);
             r.addView(actions,new TableRow.LayoutParams(UiManager.dp(this,widths[8]),UiManager.dp(this,76)));table.addView(r);
         }
-        int tableWidth=0;for(int w:widths)tableWidth+=w;hsv.addView(table,new ViewGroup.LayoutParams(UiManager.dp(this,tableWidth),-2));
-        list.addView(hsv,new LinearLayout.LayoutParams(-1,-2));
-        hsv.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        hsv.post(()->hsv.fullScroll(View.FOCUS_RIGHT));
+        int tableWidth=0;for(int w:widths)tableWidth+=w;hsv.addView(table,new ViewGroup.LayoutParams(UiManager.dp(this,tableWidth),-2));list.addView(hsv,new LinearLayout.LayoutParams(-1,-2));
     }
 
     TextView tableCell(String text,boolean header,boolean success){
@@ -708,8 +686,103 @@ public class MainActivity extends Activity {
     void delete(JSONObject p){try{cancelAlarm(this,p);JSONArray a=AppData.arr(data,"purchases"),b=new JSONArray();for(int i=0;i<a.length();i++)if(!a.getJSONObject(i).optString("id").equals(p.optString("id")))b.put(a.getJSONObject(i));data.put("purchases",b);AppData.save(this,data);goHome();}catch(Exception ignored){}}
 
     void buyersPage(){
-        base("واحدها");EditText q=input("جستجوی نام واحد");Button go=btn("🔎 جستجو");add(go);LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
-        Runnable render=()->{list.removeAllViews();JSONArray b=AppData.arr(data,"units");String s=q.getText().toString().trim();for(int i=0;i<b.length();i++){String name=b.optString(i);if(!s.isEmpty()&&!name.contains(s))continue;Button x=btn("🏠 "+name);x.setOnClickListener(v->openPage(()->buyerFile(name)));list.addView(x);}};go.setOnClickListener(v->render.run());render.run();Button addb=btn("➕ افزودن واحد");addb.setOnClickListener(v->addEntry("units","واحد جدید",this::buyersPage));add(addb);Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);finishScreen("واحدها");
+        base("واحدها");
+        EditText q=input("جستجوی نام واحد");
+        Button go=btn("🔎 جستجو");add(go);
+        LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
+        Runnable render=()->{
+            list.removeAllViews();
+            ensureUnitGroups(AppData.arr(data,"units"));
+            String s=q.getText().toString().trim();
+            addUnitGroupSection(list,"🏢 زنجیره تک طیور مارلیک گیلان",unitGroup("zanjireh"),s,true);
+            addUnitGroupSection(list,"🏠 واحدهای مستقل",unitGroup("independent"),s,false);
+        };
+        go.setOnClickListener(v->render.run());render.run();
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);
+        finishScreen("واحدها");
+    }
+
+    JSONArray unitGroup(String key){
+        try{JSONObject g=data.optJSONObject("unitGroups");if(g==null){g=new JSONObject();data.put("unitGroups",g);}JSONArray a=g.optJSONArray(key);if(a==null){a=new JSONArray();g.put(key,a);}return a;}catch(Exception e){return new JSONArray();}
+    }
+
+    boolean ensureUnitGroups(JSONArray units){
+        boolean changed=false;
+        try{
+            JSONObject g=data.optJSONObject("unitGroups");
+            if(g==null){g=new JSONObject();data.put("unitGroups",g);changed=true;}
+            JSONArray chain=g.optJSONArray("zanjireh");if(chain==null){chain=new JSONArray();g.put("zanjireh",chain);changed=true;}
+            JSONArray independent=g.optJSONArray("independent");if(independent==null){independent=new JSONArray();g.put("independent",independent);changed=true;}
+            if(!containsJsonString(chain,ZANJIREH_UNIT)){chain.put(ZANJIREH_UNIT);changed=true;}
+            if(units!=null&&!containsJsonString(units,ZANJIREH_UNIT)){units.put(ZANJIREH_UNIT);changed=true;}
+            for(int i=0;i<units.length();i++){
+                String name=units.optString(i).trim();if(name.isEmpty()||ZANJIREH_UNIT.equals(name))continue;
+                if(!containsJsonString(chain,name)&&!containsJsonString(independent,name)){independent.put(name);changed=true;}
+            }
+            JSONArray merged=new JSONArray();
+            for(int i=0;i<chain.length();i++){String n=chain.optString(i).trim();if(!n.isEmpty()&&!containsJsonString(merged,n))merged.put(n);}
+            for(int i=0;i<independent.length();i++){String n=independent.optString(i).trim();if(!n.isEmpty()&&!containsJsonString(merged,n))merged.put(n);}
+            if(!sameJsonStringArray(units,merged)){data.put("units",merged);changed=true;}
+        }catch(Exception ignored){}
+        return changed;
+    }
+
+    boolean containsJsonString(JSONArray a,String value){if(a==null||value==null)return false;for(int i=0;i<a.length();i++)if(value.equals(a.optString(i)))return true;return false;}
+    boolean sameJsonStringArray(JSONArray a,JSONArray b){if(a==null||b==null||a.length()!=b.length())return false;for(int i=0;i<a.length();i++)if(!a.optString(i).equals(b.optString(i)))return false;return true;}
+
+    void addUnitGroupSection(LinearLayout parent,String title,JSONArray group,String search,boolean chain){
+        TextView h=tv(title,18);h.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));h.setTextColor(UiManager.primary(this));h.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);parent.addView(h,new LinearLayout.LayoutParams(-1,UiManager.dp(this,56)));
+        if(chain){
+            Button rootUnit=btn("🏢 "+ZANJIREH_UNIT+"\nواحد اصلی / مبنا");
+            rootUnit.setOnClickListener(v->openPage(()->buyerFile(ZANJIREH_UNIT)));parent.addView(rootUnit);
+        }
+        int visible=0;
+        for(int i=0;i<group.length();i++){
+            String name=group.optString(i);
+            if(chain&&ZANJIREH_UNIT.equals(name))continue;
+            if(!search.isEmpty()&&!name.contains(search))continue;
+            Button x=btn((chain?"↳ ":"🏠 ")+name);
+            x.setOnClickListener(v->openPage(()->buyerFile(name)));
+            parent.addView(x);visible++;
+        }
+        if(visible==0&&!chain)add(tv("واحد مستقلی ثبت نشده است.",13));
+        if(visible==0&&chain)add(tv("هنوز واحد زیرمجموعه‌ای اضافه نشده است.",13));
+        Button add=btn("➕ افزودن واحد");
+        add.setOnClickListener(v->addGroupedUnit(chain));parent.addView(add);
+        Button transfer=btn("🔄 انتقال واحد");
+        transfer.setOnClickListener(v->transferUnitDialog(chain));parent.addView(transfer);
+        View spacer=new View(this);parent.addView(spacer,new LinearLayout.LayoutParams(1,UiManager.dp(this,14)));
+    }
+
+    void addGroupedUnit(boolean toChain){
+        EditText e=new EditText(this);e.setSingleLine(true);e.setHint(toChain?"نام واحد زیرمجموعه":"نام واحد مستقل");
+        new AlertDialog.Builder(this).setTitle(toChain?"افزودن واحد زیرمجموعه به زنجیره":"افزودن واحد مستقل").setView(e)
+            .setPositiveButton("ذخیره",(d,w)->{try{String v=e.getText().toString().trim();if(v.isEmpty())return;if(ZANJIREH_UNIT.equals(v)){Toast.makeText(this,"نام واحد اصلی از قبل وجود دارد.",Toast.LENGTH_LONG).show();return;}JSONArray chain=unitGroup("zanjireh"),ind=unitGroup("independent");if(containsJsonString(chain,v)||containsJsonString(ind,v)){Toast.makeText(this,"این واحد قبلاً ثبت شده است.",Toast.LENGTH_LONG).show();return;} (toChain?chain:ind).put(v);JSONArray units=AppData.arr(data,"units");if(!containsJsonString(units,v))units.put(v);data.put("units",units);AppData.save(this,data);buyersPage();}catch(Exception ignored){}})
+            .setNegativeButton("لغو",null).show();
+    }
+
+    void transferUnitDialog(boolean fromChain){
+        JSONArray source=unitGroup(fromChain?"zanjireh":"independent");ArrayList<String> options=new ArrayList<>();
+        for(int i=0;i<source.length();i++){String n=source.optString(i);if(fromChain&&!ZANJIREH_UNIT.equals(n))options.add(n);else if(!fromChain)options.add(n);}
+        if(options.isEmpty()){Toast.makeText(this,fromChain?"واحد زیرمجموعه‌ای برای انتقال وجود ندارد.":"واحد مستقلی برای انتقال وجود ندارد.",Toast.LENGTH_LONG).show();return;}
+        Spinner sp=spinner(options.toArray(new String[0]));
+        String target=fromChain?"واحدهای مستقل":"زنجیره تک طیور مارلیک گیلان";
+        new AlertDialog.Builder(this).setTitle("انتقال واحد به "+target).setView(sp)
+            .setMessage("تمام سوابق خرید و اطلاعات این واحد حفظ می‌شود؛ فقط جایگاه واحد در ساختار واحدها تغییر می‌کند.")
+            .setPositiveButton("انتقال",(d,w)->{String name=String.valueOf(sp.getSelectedItem());moveUnit(name,fromChain);})
+            .setNegativeButton("لغو",null).show();
+    }
+
+    void moveUnit(String name,boolean fromChain){
+        try{
+            if(name==null||name.trim().isEmpty()||ZANJIREH_UNIT.equals(name))return;
+            JSONArray from=unitGroup(fromChain?"zanjireh":"independent"),to=unitGroup(fromChain?"independent":"zanjireh");
+            JSONArray nf=new JSONArray();for(int i=0;i<from.length();i++)if(!name.equals(from.optString(i)))nf.put(from.optString(i));
+            if(!containsJsonString(to,name))to.put(name);
+            JSONObject g=data.optJSONObject("unitGroups");g.put(fromChain?"zanjireh":"independent",nf);g.put(fromChain?"independent":"zanjireh",to);
+            ensureUnitGroups(AppData.arr(data,"units"));AppData.save(this,data);
+            Toast.makeText(this,"واحد «"+name+"» با تمام سوابقش منتقل شد.",Toast.LENGTH_LONG).show();buyersPage();
+        }catch(Exception ignored){}
     }
     void buyerFile(String buyer){
         base("پرونده واحد: "+buyer);
