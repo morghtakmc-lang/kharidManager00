@@ -34,6 +34,7 @@ public class MainActivity extends Activity {
     int initialPurchaseStatus=0;
     int initialCollectedFilter=0, initialAllocatedFilter=0, initialFundingFilter=0, initialQuotaFilter=0;
     JSONObject formOldPurchase;
+    JSONArray pendingChainLinks = new JSONArray();
     final String[] labels = {"نام واحد","گواهی بهداشتی","تعداد جوجه‌ریزی","سهمیه ذرت (کیلوگرم)","سهمیه سویا (کیلوگرم)","تاریخ جوجه‌ریزی","تاریخ اعتبار","نهاده","شماره خرید","وزن (کیلوگرم)","فی (ریال)","نوع پرداخت","مبلغ خرید (ریال)","تاریخ خرید","مقدار ذرت (کیلوگرم)","مقدار سویا (کیلوگرم)","مقدار ریز مغذی و افت (کیلوگرم)","نام شرکت","تاریخ سررسید"};
     final String[] keys = {"unit","healthCertificate","chickCount","cornQuota","soyQuota","placementDate","quotaExpiry","commodity","purchaseNo","weight","fee","payment","amount","buyDate","corn","soy","micronutrient","company","mainDue"};
 
@@ -135,8 +136,132 @@ public class MainActivity extends Activity {
         dlg.show();
     }
 
+
+    boolean isChainUnit(String unit){
+        return ZANJIREH_UNIT.equals(unit==null?"":unit.trim());
+    }
+
+    void loadPendingChainLinks(JSONObject old){
+        pendingChainLinks=new JSONArray();
+        if(old==null)return;
+        try{
+            JSONArray all=data.optJSONArray("chainPurchaseLinks");
+            if(all==null)return;
+            String id=old.optString("id"), no=old.optString("purchaseNo");
+            for(int i=0;i<all.length();i++){
+                JSONObject x=all.optJSONObject(i);
+                if(x==null)continue;
+                if(id.equals(x.optString("purchaseId")) || (!no.isEmpty()&&no.equals(x.optString("purchaseNo"))))
+                    pendingChainLinks.put(new JSONObject(x.toString()));
+            }
+        }catch(Exception ignored){}
+    }
+
+    void savePendingChainLinks(JSONObject purchase){
+        try{
+            JSONArray all=data.optJSONArray("chainPurchaseLinks");
+            if(all==null)all=new JSONArray();
+            JSONArray kept=new JSONArray();
+            String id=purchase.optString("id"), no=purchase.optString("purchaseNo");
+            for(int i=0;i<all.length();i++){
+                JSONObject x=all.optJSONObject(i);
+                if(x==null)continue;
+                if(id.equals(x.optString("purchaseId")) || (!no.isEmpty()&&no.equals(x.optString("purchaseNo"))))continue;
+                kept.put(x);
+            }
+            if(isChainUnit(purchase.optString("unit"))){
+                for(int i=0;i<pendingChainLinks.length();i++){
+                    JSONObject x=pendingChainLinks.optJSONObject(i);
+                    if(x==null)continue;
+                    x.put("purchaseId",id);
+                    x.put("purchaseNo",no);
+                    x.put("chainUnit",ZANJIREH_UNIT);
+                    kept.put(x);
+                }
+            }
+            data.put("chainPurchaseLinks",kept);
+        }catch(Exception ignored){}
+    }
+
+    boolean validateChainLinks(JSONObject old){
+        if(!isChainUnit(unitSp==null?"":String.valueOf(unitSp.getSelectedItem())))return true;
+        if(pendingChainLinks.length()==0)return false;
+        double total=0;
+        try{
+            for(int i=0;i<pendingChainLinks.length();i++){
+                JSONObject x=pendingChainLinks.optJSONObject(i);if(x==null)return false;
+                String unit=x.optString("unitName").trim(),cert=x.optString("certificateNo").trim();
+                double q=toDouble(x.optString("quantity"));
+                if(unit.isEmpty()||cert.isEmpty()||q<=0)return false;
+                JSONObject base=certificateBase(unit+"|"+cert,null);
+                if(base==null)return false;
+                double availableC=Math.max(0,quotaOriginal(base,"cornQuota")-usedCorn(unit,cert,null)-transferAmount(unit,cert,"corn"));
+                double availableS=Math.max(0,quotaOriginal(base,"soyQuota")-usedSoy(unit,cert,null)-transferAmount(unit,cert,"soy"));
+                // The link amount is an allocation from the unit's remaining quota.
+                if(q>availableC+availableS+0.001)return false;
+                total+=q;
+            }
+            return total>0;
+        }catch(Exception e){return false;}
+    }
+
+    void chainLinksDialog(){
+        JSONArray units=unitGroup("zanjireh");
+        ArrayList<String> opts=new ArrayList<>();
+        for(int i=0;i<units.length();i++){
+            String n=units.optString(i).trim();
+            if(!n.isEmpty()&&!ZANJIREH_UNIT.equals(n))opts.add(n);
+        }
+        if(opts.isEmpty()){
+            Toast.makeText(this,"ابتدا حداقل یک واحد زیرمجموعه برای زنجیره ثبت کنید.",Toast.LENGTH_LONG).show();
+            return;
+        }
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
+        Spinner unit=spinner(opts.toArray(new String[0]));box.addView(unit);
+        EditText cert=inputInBox(box,"شماره گواهی بهداشتی واحد");
+        EditText qty=inputInBox(box,"مقدار سهمیه این واحد (کیلوگرم)");
+        qty.setInputType(2|8192);
+        AlertDialog dlg=new AlertDialog.Builder(this).setTitle("افزودن واحد به این خرید زنجیره").setView(box)
+            .setNegativeButton("انصراف",null).setPositiveButton("افزودن",null).create();
+        dlg.setOnShowListener(v->dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(x->{
+            String un=String.valueOf(unit.getSelectedItem()).trim();
+            String c=cert.getText().toString().trim();
+            double q=toDouble(qty.getText().toString());
+            if(un.isEmpty()||c.isEmpty()||q<=0){Toast.makeText(this,"واحد، شماره گواهی و مقدار را کامل کنید.",Toast.LENGTH_LONG).show();return;}
+            try{
+                JSONObject link=new JSONObject();
+                link.put("unitName",un);link.put("certificateNo",c);link.put("quantity",fmtDecimal(q));
+                pendingChainLinks.put(link);
+                Toast.makeText(this,"واحد به خرید اضافه شد.",Toast.LENGTH_SHORT).show();
+                dlg.dismiss();
+                refreshChainLinksPreview();
+            }catch(Exception ignored){}
+        }));
+        dlg.show();
+    }
+
+    EditText inputInBox(LinearLayout box,String hint){
+        EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));e.setPadding(14,8,14,8);box.addView(e);return e;
+    }
+
+    TextView chainLinksPreview;
+    LinearLayout chainLinksBox;
+    void refreshChainLinksPreview(){
+        if(chainLinksPreview==null)return;
+        if(pendingChainLinks.length()==0){chainLinksPreview.setText("هنوز واحدی به این خرید متصل نشده است.");return;}
+        StringBuilder s=new StringBuilder("واحدهای مرتبط با این خرید:\n");
+        for(int i=0;i<pendingChainLinks.length();i++){
+            JSONObject x=pendingChainLinks.optJSONObject(i);
+            if(x==null)continue;
+            s.append("🏠 ").append(x.optString("unitName","-"))
+             .append(" | گواهی: ").append(x.optString("certificateNo","-"))
+             .append(" | ").append(x.optString("quantity","0")).append(" کیلوگرم\n");
+        }
+        chainLinksPreview.setText(s.toString().trim());
+    }
+
     void form(JSONObject old){
-        formOldPurchase=old;
+        formOldPurchase=old; loadPendingChainLinks(old);
         base(old==null?"ثبت خرید جدید":"ویرایش خرید");inputs.clear();final TextView[] quotaStatusHolder={null}; final TextView[] formLabels=new TextView[labels.length];
         for(int i=0;i<labels.length;i++){
             formLabels[i]=tv((i+1)+". "+labels[i],14); add(formLabels[i]);
@@ -184,7 +309,14 @@ public class MainActivity extends Activity {
         TextWatcher qw=new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){quotaRender.run();}public void afterTextChanged(Editable e){}};
         inputs.get(1).addTextChangedListener(qw);inputs.get(2).addTextChangedListener(qw);inputs.get(5).addTextChangedListener(qw);
         inputs.get(1).addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){updateTransferSourceOptions();refreshShahedanehForm(formLabels);}public void afterTextChanged(Editable e){}});
-        if(unitSp!=null)unitSp.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int pos,long id){updateTransferSourceOptions();refreshShahedanehForm(formLabels);quotaRender.run();validateForm(null);}});
+        if(unitSp!=null)unitSp.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int pos,long id){
+            updateTransferSourceOptions();refreshShahedanehForm(formLabels);quotaRender.run();
+            boolean chain=isChainUnit(String.valueOf(unitSp.getSelectedItem()==null?"":unitSp.getSelectedItem()).trim());
+            if(chainLinksBox!=null)chainLinksBox.setVisibility(chain?View.VISIBLE:View.GONE);
+            if(chain){formLabels[1].setText("2. گواهی‌های واحدهای زیرمجموعه");if(inputs.get(1).getText().toString().trim().isEmpty()||"چندگانه".equals(inputs.get(1).getText().toString().trim()))inputs.get(1).setText("چندگانه");}
+            else formLabels[1].setText("2. گواهی بهداشتی");
+            validateForm(null);
+        }});
         if(transferSourceSp!=null)transferSourceSp.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int pos,long id){applyTransferSourceFields();quotaRender.run();validateForm(null);}});
         updateTransferSourceOptions();
         refreshShahedanehForm(formLabels);
@@ -192,6 +324,11 @@ public class MainActivity extends Activity {
         TextWatcher qrw=new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){quotaRender.run();}public void afterTextChanged(Editable e){}};
         inputs.get(9).addTextChangedListener(qrw);inputs.get(14).addTextChangedListener(qrw);inputs.get(15).addTextChangedListener(qrw);
 
+        chainLinksBox=new LinearLayout(this);chainLinksBox.setOrientation(LinearLayout.VERTICAL);
+        TextView chainTitle=tv("تخصیص این خرید به واحدهای زیرمجموعه",16);chainTitle.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));chainLinksBox.addView(chainTitle);
+        Button linkBtn=btn("➕ افزودن واحد زیرمجموعه و گواهی");linkBtn.setOnClickListener(v->chainLinksDialog());chainLinksBox.addView(linkBtn);
+        chainLinksPreview=tv("هنوز واحدی به این خرید متصل نشده است.",14);chainLinksPreview.setGravity(Gravity.RIGHT);chainLinksBox.addView(chainLinksPreview);
+        chainLinksBox.setVisibility(isChainUnit(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?View.VISIBLE:View.GONE);add(chainLinksBox);refreshChainLinksPreview();
         add(tv("هشدار بر اساس تاریخ سررسید",16));
         LinearLayout al=new LinearLayout(this);al.setOrientation(LinearLayout.VERTICAL);add(al);
         EditText days=new EditText(this);days.setHint("چند روز قبل از سررسید؟");days.setInputType(2);al.addView(days);
@@ -203,8 +340,6 @@ public class MainActivity extends Activity {
         days.addTextChangedListener(aw);time.addTextChangedListener(aw);inputs.get(18).addTextChangedListener(aw);
         Button clear=btn("🔕 حذف هشدار");clear.setOnClickListener(v->{days.setText("");time.setText("");updateAlarmStatus(preview,"","",inputs.get(18).getText().toString());if(old!=null){try{old.remove("alarm");old.remove("alarmRepeat");}catch(Exception ignored){}cancelAlarm(this,old);}});add(clear);
         Button save=btn("✓ ذخیره خرید و هشدار");save.setOnClickListener(v->savePurchase(old,days.getText().toString(),time.getText().toString(),repeat.getSelectedItemPosition()==1,save));add(save);
-        LinearLayout linkedCard=chainLinkedUnitsCard(p.optString("purchaseNo"));
-        if(linkedCard!=null)add(linkedCard);
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);
         finishScreen(old==null?"ثبت خرید جدید":"ویرایش خرید");
         updateAlarmStatus(preview,days.getText().toString(),time.getText().toString(),inputs.get(18).getText().toString());setupValidationListeners(save);validateForm(save);
@@ -382,6 +517,7 @@ public class MainActivity extends Activity {
         else ok=false;
         String cert2=inputs.get(1).getText().toString().trim(); String unit2=unitSp==null?"":String.valueOf(unitSp.getSelectedItem()).trim();
         if(isShahedaneh(unit2)){String src=selectedTransferSource(); if(src.isEmpty())ok=false; if(!shahedanehTransferValid(formOldPurchase,src,cert2))ok=false;}
+        else if(isChainUnit(unit2)){if(!validateChainLinks(formOldPurchase))ok=false;}
         else if(!checkQuotaLimits(formOldPurchase))ok=false;
         if(save!=null){save.setEnabled(ok);save.setAlpha(ok?1f:0.5f);}return ok;
     }
@@ -390,7 +526,9 @@ public class MainActivity extends Activity {
     GradientDrawable fieldBg(boolean valid){GradientDrawable g=new GradientDrawable();g.setColor(UiManager.card(this));g.setCornerRadius(UiManager.dp(this,UiManager.radius(this)));g.setStroke(UiManager.dp(this,1),valid?UiManager.secondary(this):Color.rgb(210,50,50));return g;}
     boolean checkQuotaLimits(JSONObject old){
         String unit=unitSp==null?"":String.valueOf(unitSp.getSelectedItem()),cert=inputs.get(1).getText().toString().trim();
-        if(unit.trim().isEmpty()||cert.isEmpty())return false;
+        if(unit.trim().isEmpty())return false;
+        if(isChainUnit(unit))return validateChainLinks(old);
+        if(cert.isEmpty())return false;
         if(isShahedaneh(unit))return shahedanehTransferValid(old,selectedTransferSource(),cert);
         JSONObject base=certificateBase(unit+"|"+cert,old);double cq=base==null?toDouble(inputs.get(3).getText().toString()):quotaOriginal(base,"cornQuota"),sq=base==null?toDouble(inputs.get(4).getText().toString()):quotaOriginal(base,"soyQuota");if(cq<=0||sq<=0)return false;double uc=usedCorn(unit,cert,old),us=usedSoy(unit,cert,old),c=toDouble(inputs.get(14).getText().toString()),so=toDouble(inputs.get(15).getText().toString());return uc+c<=cq-transferAmount(unit,cert,"corn")+0.001&&us+so<=sq-transferAmount(unit,cert,"soy")+0.001;
     }
@@ -413,7 +551,8 @@ public class MainActivity extends Activity {
     void savePurchase(JSONObject old,String ds,String tm,boolean repeat,Button saveButton){
         if(!validateForm(saveButton)){Toast.makeText(this,"اطلاعات ناقص است، ترکیب خرید یا سهمیه مجاز نیست",Toast.LENGTH_LONG).show();return;}
         try{
-            calcPurchaseComposition();String unit=String.valueOf(unitSp.getSelectedItem()).trim(),cert=inputs.get(1).getText().toString().trim();String transferSource=selectedTransferSource();JSONObject base=isShahedaneh(unit)?certificateBase(transferSource+"|"+cert,null):certificateBase(unit+"|"+cert,old);
+            calcPurchaseComposition();String unit=String.valueOf(unitSp.getSelectedItem()).trim(),cert=inputs.get(1).getText().toString().trim();String transferSource=selectedTransferSource();JSONObject base=isShahedaneh(unit)?certificateBase(transferSource+"|"+cert,null):isChainUnit(unit)?null:certificateBase(unit+"|"+cert,old);
+            if(isChainUnit(unit)){cert="چندگانه";inputs.get(1).setText(cert);if(!validateChainLinks(old)){Toast.makeText(this,"حداقل یک واحد، گواهی و مقدار معتبر برای خرید زنجیره ثبت کنید.",Toast.LENGTH_LONG).show();return;}}
             if(isShahedaneh(unit)){if(transferSource.isEmpty()||!shahedanehTransferValid(old,transferSource,cert)){Toast.makeText(this,"برای این خرید، منبع و مانده سهمیه منتقل‌شده به شاهدانه کافی نیست.",Toast.LENGTH_LONG).show();return;} inputs.get(3).setText(fmtDecimal(transferRemaining(transferSource,cert,"corn"))); inputs.get(4).setText(fmtDecimal(transferRemaining(transferSource,cert,"soy"))); String td=firstTransferDate(transferSource,cert); inputs.get(5).setText(td); inputs.get(6).setText(addPersianDays(td,60));}
             else if(base!=null){double cq=quotaOriginal(base,"cornQuota"),sq=quotaOriginal(base,"soyQuota");String oldChick=base.optString("chickCount"),oldDate=base.optString("placementDate");if(Math.abs(cq-toDouble(inputs.get(3).getText().toString()))>0.001||Math.abs(sq-toDouble(inputs.get(4).getText().toString()))>0.001||(!oldChick.isEmpty()&&!oldChick.equals(inputs.get(2).getText().toString()))||(!oldDate.isEmpty()&&!oldDate.equals(inputs.get(5).getText().toString()))){Toast.makeText(this,"این گواهی قبلاً ثبت شده است؛ سهمیه، تعداد جوجه‌ریزی و تاریخ جوجه‌ریزی باید همان اطلاعات اولیه گواهی باشد.",Toast.LENGTH_LONG).show();return;}}
             if(!checkQuotaLimits(old)){Toast.makeText(this,"مقدار ذرت یا سویا از سهمیه این گواهی بیشتر می‌شود.",Toast.LENGTH_LONG).show();return;}
@@ -421,7 +560,8 @@ public class MainActivity extends Activity {
             r.put("paymentDetail",paymentDetailSp==null||paymentDetailSp.getSelectedItem()==null?"":String.valueOf(paymentDetailSp.getSelectedItem()));
             r.put("cardRegistrationDate",isShahedaneh(unit)?"":(cardDateInput==null?"":cardDateInput.getText().toString().trim())); if(isShahedaneh(unit)){ r.put("chickCount",""); r.put("placementDate","");r.put("transferSourceUnit",transferSource);r.put("transferSourceCertificate",cert);r.put("transferOrigin","quotaTransfer");}
             r.put("id",old==null?UUID.randomUUID().toString():old.optString("id"));r.put("buyer",unit);boolean alarmConfigured=ds.trim().matches("\\d+")&&tm.trim().matches("([01]\\d|2[0-3]):[0-5]\\d")&&!inputs.get(18).getText().toString().trim().isEmpty();r.remove("subDue");r.put("collected",old!=null&&old.optBoolean("collected",false));r.put("collectedDate",old==null?"":old.optString("collectedDate",""));r.put("allocated",old!=null&&old.optBoolean("allocated",false));r.put("allocatedDate",old==null?"":old.optString("allocatedDate",""));r.put("funding",old!=null&&old.has("funding")?old.optJSONArray("funding"):new JSONArray());r.put("alarm",alarmConfigured);r.put("alarmDays",parseInt(ds,1));r.put("alarmTime",tm.trim());r.put("alarmRepeat",repeat);
-            JSONArray a=AppData.arr(data,"purchases");boolean replaced=false;for(int i=0;i<a.length();i++)if(a.optJSONObject(i).optString("id").equals(r.optString("id"))){a.put(i,r);replaced=true;break;}if(!replaced)a.put(r);data.put("purchases",a);if(!isShahedaneh(unit))updateCertificateCompletion(unit,cert);addUnique("units",unit);addUnique("buyers",unit);addUnique("companies",r.optString("company"));AppData.save(this,data);if(alarmConfigured)schedule(this,r);else cancelAlarm(this,r);boolean complete=isCertificateComplete(unit,cert);Toast.makeText(this,complete?"خرید با موفقیت ذخیره شد؛ خرید سهمیه این گواهی تکمیل شد.":"خرید با موفقیت ذخیره شد",Toast.LENGTH_LONG).show();goHome();
+            savePendingChainLinks(r);
+            JSONArray a=AppData.arr(data,"purchases");boolean replaced=false;for(int i=0;i<a.length();i++)if(a.optJSONObject(i).optString("id").equals(r.optString("id"))){a.put(i,r);replaced=true;break;}if(!replaced)a.put(r);data.put("purchases",a);if(!isShahedaneh(unit)&&!isChainUnit(unit))updateCertificateCompletion(unit,cert);addUnique("units",unit);addUnique("buyers",unit);addUnique("companies",r.optString("company"));AppData.save(this,data);if(alarmConfigured)schedule(this,r);else cancelAlarm(this,r);boolean complete=!isChainUnit(unit)&&!isShahedaneh(unit)&&isCertificateComplete(unit,cert);Toast.makeText(this,complete?"خرید با موفقیت ذخیره شد؛ خرید سهمیه این گواهی تکمیل شد.":"خرید با موفقیت ذخیره شد",Toast.LENGTH_LONG).show();goHome();
         }catch(Exception e){Toast.makeText(this,"خطا در ذخیره اطلاعات",Toast.LENGTH_LONG).show();}
     }
     int parseInt(String s,int d){try{return Integer.parseInt(s.trim());}catch(Exception e){return d;}}
@@ -594,6 +734,37 @@ public class MainActivity extends Activity {
 
     JSONArray sortedPurchases(){JSONArray src=AppData.arr(data,"purchases");ArrayList<JSONObject> l=new ArrayList<>();for(int i=0;i<src.length();i++)l.add(src.optJSONObject(i));Collections.sort(l,(a,b)->b.optString("buyDate").compareTo(a.optString("buyDate")));JSONArray r=new JSONArray();for(JSONObject p:l)r.put(p);return r;}
 
+
+    JSONArray purchaseChainLinks(String purchaseId,String purchaseNo){
+        JSONArray out=new JSONArray();
+        JSONArray all=data.optJSONArray("chainPurchaseLinks");
+        if(all==null)return out;
+        for(int i=0;i<all.length();i++){
+            JSONObject x=all.optJSONObject(i);
+            if(x==null)continue;
+            if((!purchaseId.isEmpty()&&purchaseId.equals(x.optString("purchaseId"))) ||
+               (!purchaseNo.isEmpty()&&purchaseNo.equals(x.optString("purchaseNo"))))out.put(x);
+        }
+        return out;
+    }
+
+    LinearLayout chainLinkedUnitsCard(String purchaseId,String purchaseNo){
+        JSONArray a=purchaseChainLinks(purchaseId,purchaseNo);
+        if(a.length()==0)return null;
+        LinearLayout card=statsCard("واحدهای زیرمجموعه این خرید");
+        LinearLayout grid=statsGrid(card);
+        double total=0;
+        for(int i=0;i<a.length();i++){
+            JSONObject x=a.optJSONObject(i);if(x==null)continue;
+            double q=toDouble(x.optString("quantity"));total+=q;
+            addSummaryPair(grid,"🏠 "+x.optString("unitName","-"),
+                "گواهی "+x.optString("certificateNo","-"),
+                "⚖️ سهم این واحد",fmtDecimal(q)+" کیلوگرم");
+        }
+        addSummaryPair(grid,"📦 مجموع تخصیص به واحدها",fmtDecimal(total)+" کیلوگرم","","");
+        return card;
+    }
+
     void details(JSONObject p){
         base("جزئیات کامل خرید");
         String unitName=p.optString("unit",p.optString("buyer"));
@@ -603,6 +774,8 @@ public class MainActivity extends Activity {
         add(tv("تاریخ ثبت کارت: "+p.optString("cardRegistrationDate",p.optString("cardDate","-")),15));
         add(tv("نوع نهاده / وزن:\n• "+p.optString("commodity","-")+" : "+fmtDecimal(toDouble(p.optString("weight")))+" کیلوگرم",15));
         String cert=p.optString("healthCertificate");JSONObject cb=certificateBase(unitName+"|"+cert,null);if(cb!=null){double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota"),uc=usedCorn(unitName,cert,null),us=usedSoy(unitName,cert,null),tc=transferAmount(unitName,cert,"corn"),ts=transferAmount(unitName,cert,"soy");add(tv("📌 وضعیت سهمیه این گواهی\nسهمیه اولیه ذرت: "+fmtDecimal(cq)+" کیلوگرم\nخریدشده ذرت: "+fmtDecimal(uc)+" | مانده سهمیه: "+fmtDecimal(Math.max(0,cq-uc-tc))+" کیلوگرم\nذرت منتقل‌شده به شاهدانه: "+fmtDecimal(tc)+" کیلوگرم\nسهمیه اولیه سویا: "+fmtDecimal(sq)+" کیلوگرم\nخریدشده سویا: "+fmtDecimal(us)+" | مانده سهمیه: "+fmtDecimal(Math.max(0,sq-us-ts))+" کیلوگرم\nسویا منتقل‌شده به شاهدانه: "+fmtDecimal(ts)+" کیلوگرم\n"+(isCertificateComplete(unitName,cert)?"✅ تکمیل خرید سهمیه":"⏳ سهمیه هنوز تکمیل نشده است"),15));}
+        LinearLayout linked=chainLinkedUnitsCard(p.optString("id"),p.optString("purchaseNo"));
+        if(linked!=null)add(linked);
         add(tv("وضعیت وصول: "+(p.optBoolean("collected")?"✅ وصول شد":"⏳ وصول نشده")+
                 (p.optString("collectedDate").isEmpty()?"":" | تاریخ وصول: "+p.optString("collectedDate")),16));
         add(tv("وضعیت تخصیص: "+(p.optBoolean("allocated")?"✅ تخصیص شد":"⏳ تخصیص نشده"),16));
@@ -851,6 +1024,29 @@ public class MainActivity extends Activity {
             Toast.makeText(this,"واحد «"+name+"» با تمام سوابقش منتقل شد.",Toast.LENGTH_LONG).show();buyersPage();
         }catch(Exception ignored){}
     }
+
+    double linkedQuantityForUnit(String unitName){
+        double s=0;JSONArray all=data.optJSONArray("chainPurchaseLinks");
+        if(all==null)return 0;
+        for(int i=0;i<all.length();i++){
+            JSONObject x=all.optJSONObject(i);
+            if(x!=null&&unitName.equals(x.optString("unitName")))s+=toDouble(x.optString("quantity"));
+        }
+        return s;
+    }
+    int linkedPurchaseCountForUnit(String unitName){
+        HashSet<String> ids=new HashSet<>();JSONArray all=data.optJSONArray("chainPurchaseLinks");
+        if(all==null)return 0;
+        for(int i=0;i<all.length();i++){
+            JSONObject x=all.optJSONObject(i);
+            if(x!=null&&unitName.equals(x.optString("unitName"))){
+                String id=x.optString("purchaseId",x.optString("purchaseNo"));
+                if(!id.isEmpty())ids.add(id);
+            }
+        }
+        return ids.size();
+    }
+
     void buyerFile(String buyer){
         base("پرونده واحد: "+buyer);
         JSONArray a=AppData.arr(data,"purchases");
@@ -896,6 +1092,17 @@ public class MainActivity extends Activity {
         addSummaryCommodity(grid,"🌱 سویا",new String[]{"سهمیه","خرید","انتقال","مانده"},new String[]{fmtDecimal(initialSoy),fmtDecimal(purchasedSoy),fmtDecimal(transferredSoy),fmtDecimal(remainingSoy)});
         TextView wt=tv(inputWeightSummary(purchasesInRange(buyer,"","")),13);wt.setGravity(Gravity.RIGHT);grid.addView(wt);
         addSummaryPair(grid,"📋 گواهی‌های کامل",""+fullQuota,"⏳ گواهی‌های دارای مانده",""+incompleteCerts.size());
+        if(!isChainUnit(buyer)){
+            int linkedCount=linkedPurchaseCountForUnit(buyer);
+            double linkedQty=linkedQuantityForUnit(buyer);
+            if(linkedCount>0){
+                addSummaryPair(grid,"🔗 خریدهای زنجیره‌ای مرتبط",""+linkedCount+" خرید","⚖️ سهمیه دریافت‌شده از زنجیره",fmtDecimal(linkedQty)+" کیلوگرم");
+            }
+        }else{
+            JSONArray links=data.optJSONArray("chainPurchaseLinks");int linkedCount=0;double linkedQty=0;
+            if(links!=null){HashSet<String> ids=new HashSet<>();for(int i=0;i<links.length();i++){JSONObject x=links.optJSONObject(i);if(x==null)continue;ids.add(x.optString("purchaseId",x.optString("purchaseNo")));linkedQty+=toDouble(x.optString("quantity"));}linkedCount=ids.size();}
+            addSummaryPair(grid,"🔗 خریدهای دارای تخصیص به زیرمجموعه",""+linkedCount+" خرید","⚖️ مجموع سهم تخصیص‌یافته",fmtDecimal(linkedQty)+" کیلوگرم");
+        }
         add(stats);
 
         add(tv("شماره‌های وصول‌نشده",15));addPurchaseNumberList(noColl);
@@ -1455,92 +1662,6 @@ public class MainActivity extends Activity {
     }
     void addStatsText(LinearLayout grid,String title,String value){
         addSummaryPair(grid,title,value,"","");
-    }
-
-
-    // ارتباط خرید زنجیره با چند واحد زیرمجموعه
-    void saveChainPurchaseLinks(String purchaseNo, String chainName, JSONArray links){
-        try{
-            android.content.SharedPreferences sp=getSharedPreferences("chain_purchase_links",MODE_PRIVATE);
-            JSONArray all;
-            try{ all=new JSONArray(sp.getString("items","[]")); }catch(Exception e){ all=new JSONArray(); }
-            for(int i=0;i<links.length();i++){
-                JSONObject link=links.optJSONObject(i);
-                if(link==null)continue;
-                link.put("purchaseNo",purchaseNo);
-                link.put("chainName",chainName);
-                all.put(link);
-            }
-            sp.edit().putString("items",all.toString()).apply();
-        }catch(Exception ignored){}
-    }
-
-    JSONArray getChainPurchaseLinks(String purchaseNo){
-        JSONArray out=new JSONArray();
-        try{
-            android.content.SharedPreferences sp=getSharedPreferences("chain_purchase_links",MODE_PRIVATE);
-            JSONArray all=new JSONArray(sp.getString("items","[]"));
-            for(int i=0;i<all.length();i++){
-                JSONObject x=all.optJSONObject(i);
-                if(x!=null && purchaseNo.equals(x.optString("purchaseNo"))) out.put(x);
-            }
-        }catch(Exception ignored){}
-        return out;
-    }
-
-    JSONArray getSubUnitPurchaseLinks(String unitName){
-        JSONArray out=new JSONArray();
-        try{
-            android.content.SharedPreferences sp=getSharedPreferences("chain_purchase_links",MODE_PRIVATE);
-            JSONArray all=new JSONArray(sp.getString("items","[]"));
-            for(int i=0;i<all.length();i++){
-                JSONObject x=all.optJSONObject(i);
-                if(x!=null && unitName.equals(x.optString("unitName"))) out.put(x);
-            }
-        }catch(Exception ignored){}
-        return out;
-    }
-
-    double chainLinkedQuantity(String unitName){
-        double sum=0;
-        JSONArray a=getSubUnitPurchaseLinks(unitName);
-        for(int i=0;i<a.length();i++){
-            JSONObject x=a.optJSONObject(i);
-            if(x!=null) sum+=toDouble(x.optString("quantity"));
-        }
-        return sum;
-    }
-
-    String chainLinksSummary(String purchaseNo){
-        JSONArray a=getChainPurchaseLinks(purchaseNo);
-        if(a.length()==0)return "";
-        StringBuilder s=new StringBuilder("واحدهای مرتبط: ");
-        for(int i=0;i<a.length();i++){
-            JSONObject x=a.optJSONObject(i);
-            if(x==null)continue;
-            if(i>0)s.append(" | ");
-            s.append(x.optString("unitName","-"))
-             .append(" — گواهی ").append(x.optString("certificateNo","-"))
-             .append(" — ").append(x.optString("quantity","0")).append(" کیلوگرم");
-        }
-        return s.toString();
-    }
-
-    LinearLayout chainLinkedUnitsCard(String purchaseNo){
-        JSONArray a=getChainPurchaseLinks(purchaseNo);
-        if(a.length()==0)return null;
-        LinearLayout card=statsCard("واحدهای زیرمجموعه مرتبط با این خرید");
-        LinearLayout grid=statsGrid(card);
-        for(int i=0;i<a.length();i++){
-            JSONObject x=a.optJSONObject(i);
-            if(x==null)continue;
-            addSummaryPair(grid,
-                "🏠 "+x.optString("unitName","-"),
-                "گواهی "+x.optString("certificateNo","-"),
-                "⚖️ مقدار",
-                x.optString("quantity","0")+" کیلوگرم");
-        }
-        return card;
     }
 
 }
