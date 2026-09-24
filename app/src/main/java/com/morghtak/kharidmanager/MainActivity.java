@@ -531,32 +531,52 @@ public class MainActivity extends Activity {
 
     void addSummaryPair(LinearLayout parent,String title1,String value1,String title2,String value2){
         LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0,0,0,UiManager.dp(this,1));
         LinearLayout c1=summaryMetric(title1,value1),c2=summaryMetric(title2,value2);
-        row.addView(c1,new LinearLayout.LayoutParams(0,-2,1));
-        View divider=new View(this);divider.setBackgroundColor(UiManager.secondary(this));row.addView(divider,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,64)));
-        row.addView(c2,new LinearLayout.LayoutParams(0,-2,1));
-        parent.addView(row,new LinearLayout.LayoutParams(-1,-2));
+        row.addView(c1,new LinearLayout.LayoutParams(0,UiManager.dp(this,76),1));
+        View divider=new View(this);divider.setBackgroundColor(Color.argb(55,0,120,105));
+        row.addView(divider,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,58)));
+        row.addView(c2,new LinearLayout.LayoutParams(0,UiManager.dp(this,76),1));
+        parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,77)));
     }
 
     LinearLayout summaryMetric(String title,String value){
-        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setGravity(Gravity.CENTER);box.setPadding(UiManager.dp(this,8),UiManager.dp(this,10),UiManager.dp(this,8),UiManager.dp(this,10));
-        TextView t=tv(title,12);t.setGravity(Gravity.CENTER);t.setTextColor(UiManager.text(this));t.setMaxLines(2);
-        TextView v=tv(value,16);v.setGravity(Gravity.CENTER);v.setTextColor(UiManager.primary(this));v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));v.setMaxLines(2);
-        box.addView(t,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));box.addView(v,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));return box;
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setGravity(Gravity.CENTER);
+        box.setPadding(UiManager.dp(this,5),UiManager.dp(this,5),UiManager.dp(this,5),UiManager.dp(this,5));
+        TextView t=tv(title,11);t.setGravity(Gravity.CENTER);t.setTextColor(UiManager.text(this));t.setMaxLines(2);t.setEllipsize(null);
+        TextView v=tv(value,15);v.setGravity(Gravity.CENTER);v.setTextColor(UiManager.primary(this));v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));v.setMaxLines(2);v.setEllipsize(null);
+        box.addView(t,new LinearLayout.LayoutParams(-1,UiManager.dp(this,30)));
+        box.addView(v,new LinearLayout.LayoutParams(-1,UiManager.dp(this,30)));
+        return box;
     }
 
     void addSummaryCommodity(LinearLayout parent,String title,String[] labels,String[] values){
-        TextView heading=tv(title,15);heading.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));heading.setTextColor(UiManager.primary(this));heading.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);heading.setPadding(UiManager.dp(this,8),UiManager.dp(this,8),UiManager.dp(this,8),UiManager.dp(this,4));
+        TextView heading=tv(title,14);heading.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));heading.setTextColor(UiManager.text(this));
+        heading.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);heading.setPadding(UiManager.dp(this,8),UiManager.dp(this,5),UiManager.dp(this,8),UiManager.dp(this,2));
         parent.addView(heading,new LinearLayout.LayoutParams(-1,UiManager.dp(this,42)));
-        LinearLayout row1=new LinearLayout(this);row1.setOrientation(LinearLayout.HORIZONTAL);LinearLayout row2=new LinearLayout(this);row2.setOrientation(LinearLayout.HORIZONTAL);
-        for(int i=0;i<2;i++){
-            LinearLayout c=summaryMetric(labels[i],values[i]+"\nکیلوگرم");row1.addView(c,new LinearLayout.LayoutParams(0,-2,1));
-            LinearLayout c2=summaryMetric(labels[i+2],values[i+2]+"\nکیلوگرم");row2.addView(c2,new LinearLayout.LayoutParams(0,-2,1));
-        }
-        addSummaryDivider(row1);addSummaryDivider(row2);parent.addView(row1,new LinearLayout.LayoutParams(-1,-2));parent.addView(row2,new LinearLayout.LayoutParams(-1,-2));
-    }
 
-    void addSummaryDivider(LinearLayout row){View divider=new View(this);divider.setBackgroundColor(UiManager.secondary(this));row.addView(divider,1,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,58)));}
+        // Four compact cells on wider screens; two-by-two on narrow phones.
+        int widthDp=getResources().getConfiguration().screenWidthDp;
+        if(widthDp>=520){
+            LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);
+            for(int i=0;i<4;i++){
+                LinearLayout c=summaryMetric(labels[i],values[i]+"\nکیلوگرم");
+                row.addView(c,new LinearLayout.LayoutParams(0,UiManager.dp(this,76),1));
+                if(i<3){View d=new View(this);d.setBackgroundColor(Color.argb(55,0,120,105));row.addView(d,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,58)));}
+            }
+            parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,77)));
+        }else{
+            for(int r=0;r<2;r++){
+                LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);
+                for(int i=r*2;i<r*2+2;i++){
+                    LinearLayout c=summaryMetric(labels[i],values[i]+"\nکیلوگرم");
+                    row.addView(c,new LinearLayout.LayoutParams(0,UiManager.dp(this,76),1));
+                    if(i==r*2){View d=new View(this);d.setBackgroundColor(Color.argb(55,0,120,105));row.addView(d,new LinearLayout.LayoutParams(UiManager.dp(this,1),UiManager.dp(this,58)));}
+                }
+                parent.addView(row,new LinearLayout.LayoutParams(-1,UiManager.dp(this,77)));
+            }
+        }
+    }
 
     double totalPurchaseWeight(List<JSONObject> purchases){double s=0;for(JSONObject p:purchases)if(p!=null)s+=toDouble(p.optString("weight"));return s;}
 
@@ -579,7 +599,10 @@ public class MainActivity extends Activity {
             Button del=miniAction("🗑");del.setContentDescription("حذف");del.setTextColor(Color.rgb(220,50,50));del.setOnClickListener(v->confirmDelete(p));actions.addView(del);
             r.addView(actions,new TableRow.LayoutParams(UiManager.dp(this,widths[8]),UiManager.dp(this,76)));table.addView(r);
         }
-        int tableWidth=0;for(int w:widths)tableWidth+=w;hsv.addView(table,new ViewGroup.LayoutParams(UiManager.dp(this,tableWidth),-2));list.addView(hsv,new LinearLayout.LayoutParams(-1,-2));
+        int tableWidth=0;for(int w:widths)tableWidth+=w;hsv.addView(table,new ViewGroup.LayoutParams(UiManager.dp(this,tableWidth),-2));
+        list.addView(hsv,new LinearLayout.LayoutParams(-1,-2));
+        hsv.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        hsv.post(()->hsv.fullScroll(View.FOCUS_RIGHT));
     }
 
     TextView tableCell(String text,boolean header,boolean success){
