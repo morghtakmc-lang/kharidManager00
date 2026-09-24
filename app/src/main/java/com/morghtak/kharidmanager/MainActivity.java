@@ -1206,7 +1206,7 @@ public class MainActivity extends Activity {
         input.setSingleLine(true);
         input.setText(currentName);
         input.setSelectAllOnFocus(true);
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        new android.app.AlertDialog.Builder(this)
                 .setTitle("ویرایش نام واحد")
                 .setView(input)
                 .setNegativeButton("انصراف", null)
