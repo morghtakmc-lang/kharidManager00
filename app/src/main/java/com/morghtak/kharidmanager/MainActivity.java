@@ -1212,7 +1212,9 @@ public class MainActivity extends Activity {
                 .setNegativeButton("انصراف", null)
                 .setPositiveButton("ذخیره", (dialog, which) -> {
                     String name = input.getText().toString().trim();
-                    if (!name.isEmpty()) onSaved.accept(name);
+                    if (!name.isEmpty()) {
+                        onSaved.accept(name);
+                    }
                 })
                 .show();
     }
