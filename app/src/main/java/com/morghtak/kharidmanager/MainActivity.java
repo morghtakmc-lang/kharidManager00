@@ -687,19 +687,67 @@ public class MainActivity extends Activity {
 
     void buyersPage(){
         base("واحدها");
+        TextView info=tv("ساختار واحدها را از طریق دو بخش زیر مدیریت کنید.",14);
+        info.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);add(info);
+
+        Button chain=btn("🏢  زنجیره تک طیور مارلیک گیلان\nواحد اصلی / مبنا");
+        chain.setOnClickListener(v->openPage(()->unitGroupPage(true)));
+        add(chain);
+
+        Button independent=btn("🏠  واحدهای مستقل\nواحدهای خارج از زنجیره");
+        independent.setOnClickListener(v->openPage(()->unitGroupPage(false)));
+        add(independent);
+
+        // واحد قدیمی «شاهدانه طیور مارلیک» و منطق قبلی آن حفظ می‌شود.
+        Button shahedaneh=btn("🏢  شاهدانه طیور مارلیک\nواحد موجود / دارای سوابق قبلی");
+        shahedaneh.setOnClickListener(v->openPage(()->buyerFile(SHAHEDANEH_UNIT)));
+        add(shahedaneh);
+
+        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);
+        finishScreen("واحدها");
+    }
+
+    void unitGroupPage(boolean chain){
+        String title=chain?"زنجیره تک طیور مارلیک گیلان":"واحدهای مستقل";
+        base(title);
         EditText q=input("جستجوی نام واحد");
         Button go=btn("🔎 جستجو");add(go);
         LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);add(list);
         Runnable render=()->{
             list.removeAllViews();
             ensureUnitGroups(AppData.arr(data,"units"));
+            JSONArray group=unitGroup(chain?"zanjireh":"independent");
             String s=q.getText().toString().trim();
-            addUnitGroupSection(list,"🏢 زنجیره تک طیور مارلیک گیلان",unitGroup("zanjireh"),s,true);
-            addUnitGroupSection(list,"🏠 واحدهای مستقل",unitGroup("independent"),s,false);
+            TextView h=tv(chain?"واحد اصلی و واحدهای زیرمجموعه":"فهرست واحدهای مستقل",17);
+            h.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));
+            h.setTextColor(UiManager.primary(this));
+            h.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+            list.addView(h,new LinearLayout.LayoutParams(-1,UiManager.dp(this,52)));
+
+            int visible=0;
+            for(int i=0;i<group.length();i++){
+                String name=group.optString(i);
+                if(chain&&ZANJIREH_UNIT.equals(name)){
+                    Button rootUnit=btn("🏢 "+ZANJIREH_UNIT+"\nواحد اصلی / مبنا");
+                    rootUnit.setOnClickListener(v->openPage(()->buyerFile(ZANJIREH_UNIT)));
+                    if(s.isEmpty()||name.contains(s)){list.addView(rootUnit);visible++;}
+                    continue;
+                }
+                if(!s.isEmpty()&&!name.contains(s))continue;
+                Button x=btn((chain?"↳ ":"🏠 ")+name);
+                x.setOnClickListener(v->openPage(()->buyerFile(name)));
+                list.addView(x);visible++;
+            }
+            if(visible==0)list.addView(tv(chain?"هنوز واحدی در زنجیره ثبت نشده است.":"واحد مستقلی ثبت نشده است.",13));
+
+            Button add=btn("➕ افزودن واحد");
+            add.setOnClickListener(v->addGroupedUnit(chain));list.addView(add);
+            Button transfer=btn("🔄 انتقال واحد");
+            transfer.setOnClickListener(v->transferUnitDialog(chain));list.addView(transfer);
         };
         go.setOnClickListener(v->render.run());render.run();
-        Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);
-        finishScreen("واحدها");
+        Button back=btn("← بازگشت به واحدها");back.setOnClickListener(v->back());add(back);
+        finishScreen(title);
     }
 
     JSONArray unitGroup(String key){
@@ -713,15 +761,22 @@ public class MainActivity extends Activity {
             if(g==null){g=new JSONObject();data.put("unitGroups",g);changed=true;}
             JSONArray chain=g.optJSONArray("zanjireh");if(chain==null){chain=new JSONArray();g.put("zanjireh",chain);changed=true;}
             JSONArray independent=g.optJSONArray("independent");if(independent==null){independent=new JSONArray();g.put("independent",independent);changed=true;}
+            JSONArray cleanChain=new JSONArray();for(int i=0;i<chain.length();i++){String n=chain.optString(i).trim();if(!n.isEmpty()&&!SHAHEDANEH_UNIT.equals(n)&&!containsJsonString(cleanChain,n))cleanChain.put(n);}
+            JSONArray cleanIndependent=new JSONArray();for(int i=0;i<independent.length();i++){String n=independent.optString(i).trim();if(!n.isEmpty()&&!SHAHEDANEH_UNIT.equals(n)&&!containsJsonString(cleanIndependent,n))cleanIndependent.put(n);}
+            chain=cleanChain;independent=cleanIndependent;g.put("zanjireh",chain);g.put("independent",independent);
             if(!containsJsonString(chain,ZANJIREH_UNIT)){chain.put(ZANJIREH_UNIT);changed=true;}
             if(units!=null&&!containsJsonString(units,ZANJIREH_UNIT)){units.put(ZANJIREH_UNIT);changed=true;}
             for(int i=0;i<units.length();i++){
-                String name=units.optString(i).trim();if(name.isEmpty()||ZANJIREH_UNIT.equals(name))continue;
+                String name=units.optString(i).trim();
+                // شاهدانه واحد مستقلی با منطق و سوابق قبلی است؛ در ساختار جدید زنجیره/مستقل قرار نمی‌گیرد.
+                if(name.isEmpty()||ZANJIREH_UNIT.equals(name)||SHAHEDANEH_UNIT.equals(name))continue;
                 if(!containsJsonString(chain,name)&&!containsJsonString(independent,name)){independent.put(name);changed=true;}
             }
             JSONArray merged=new JSONArray();
-            for(int i=0;i<chain.length();i++){String n=chain.optString(i).trim();if(!n.isEmpty()&&!containsJsonString(merged,n))merged.put(n);}
-            for(int i=0;i<independent.length();i++){String n=independent.optString(i).trim();if(!n.isEmpty()&&!containsJsonString(merged,n))merged.put(n);}
+            for(int i=0;i<chain.length();i++){String n=chain.optString(i).trim();if(!n.isEmpty()&&!containsJsonString(merged,n)&&!SHAHEDANEH_UNIT.equals(n))merged.put(n);}
+            for(int i=0;i<independent.length();i++){String n=independent.optString(i).trim();if(!n.isEmpty()&&!containsJsonString(merged,n)&&!SHAHEDANEH_UNIT.equals(n))merged.put(n);}
+            // شاهدانه باید در فهرست اصلی واحدها برای حفظ تمام سوابق قبلی باقی بماند.
+            if(containsJsonString(units,SHAHEDANEH_UNIT)&&!containsJsonString(merged,SHAHEDANEH_UNIT))merged.put(SHAHEDANEH_UNIT);
             if(!sameJsonStringArray(units,merged)){data.put("units",merged);changed=true;}
         }catch(Exception ignored){}
         return changed;
@@ -730,34 +785,10 @@ public class MainActivity extends Activity {
     boolean containsJsonString(JSONArray a,String value){if(a==null||value==null)return false;for(int i=0;i<a.length();i++)if(value.equals(a.optString(i)))return true;return false;}
     boolean sameJsonStringArray(JSONArray a,JSONArray b){if(a==null||b==null||a.length()!=b.length())return false;for(int i=0;i<a.length();i++)if(!a.optString(i).equals(b.optString(i)))return false;return true;}
 
-    void addUnitGroupSection(LinearLayout parent,String title,JSONArray group,String search,boolean chain){
-        TextView h=tv(title,18);h.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));h.setTextColor(UiManager.primary(this));h.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);parent.addView(h,new LinearLayout.LayoutParams(-1,UiManager.dp(this,56)));
-        if(chain){
-            Button rootUnit=btn("🏢 "+ZANJIREH_UNIT+"\nواحد اصلی / مبنا");
-            rootUnit.setOnClickListener(v->openPage(()->buyerFile(ZANJIREH_UNIT)));parent.addView(rootUnit);
-        }
-        int visible=0;
-        for(int i=0;i<group.length();i++){
-            String name=group.optString(i);
-            if(chain&&ZANJIREH_UNIT.equals(name))continue;
-            if(!search.isEmpty()&&!name.contains(search))continue;
-            Button x=btn((chain?"↳ ":"🏠 ")+name);
-            x.setOnClickListener(v->openPage(()->buyerFile(name)));
-            parent.addView(x);visible++;
-        }
-        if(visible==0&&!chain)add(tv("واحد مستقلی ثبت نشده است.",13));
-        if(visible==0&&chain)add(tv("هنوز واحد زیرمجموعه‌ای اضافه نشده است.",13));
-        Button add=btn("➕ افزودن واحد");
-        add.setOnClickListener(v->addGroupedUnit(chain));parent.addView(add);
-        Button transfer=btn("🔄 انتقال واحد");
-        transfer.setOnClickListener(v->transferUnitDialog(chain));parent.addView(transfer);
-        View spacer=new View(this);parent.addView(spacer,new LinearLayout.LayoutParams(1,UiManager.dp(this,14)));
-    }
-
     void addGroupedUnit(boolean toChain){
         EditText e=new EditText(this);e.setSingleLine(true);e.setHint(toChain?"نام واحد زیرمجموعه":"نام واحد مستقل");
         new AlertDialog.Builder(this).setTitle(toChain?"افزودن واحد زیرمجموعه به زنجیره":"افزودن واحد مستقل").setView(e)
-            .setPositiveButton("ذخیره",(d,w)->{try{String v=e.getText().toString().trim();if(v.isEmpty())return;if(ZANJIREH_UNIT.equals(v)){Toast.makeText(this,"نام واحد اصلی از قبل وجود دارد.",Toast.LENGTH_LONG).show();return;}JSONArray chain=unitGroup("zanjireh"),ind=unitGroup("independent");if(containsJsonString(chain,v)||containsJsonString(ind,v)){Toast.makeText(this,"این واحد قبلاً ثبت شده است.",Toast.LENGTH_LONG).show();return;} (toChain?chain:ind).put(v);JSONArray units=AppData.arr(data,"units");if(!containsJsonString(units,v))units.put(v);data.put("units",units);AppData.save(this,data);buyersPage();}catch(Exception ignored){}})
+            .setPositiveButton("ذخیره",(d,w)->{try{String v=e.getText().toString().trim();if(v.isEmpty())return;if(ZANJIREH_UNIT.equals(v)){Toast.makeText(this,"نام واحد اصلی از قبل وجود دارد.",Toast.LENGTH_LONG).show();return;}if(SHAHEDANEH_UNIT.equals(v)){Toast.makeText(this,"شاهدانه طیور مارلیک از قبل وجود دارد و منطق مستقل خودش را دارد.",Toast.LENGTH_LONG).show();return;}JSONArray chain=unitGroup("zanjireh"),ind=unitGroup("independent");if(containsJsonString(chain,v)||containsJsonString(ind,v)){Toast.makeText(this,"این واحد قبلاً ثبت شده است.",Toast.LENGTH_LONG).show();return;} (toChain?chain:ind).put(v);JSONArray units=AppData.arr(data,"units");if(!containsJsonString(units,v))units.put(v);data.put("units",units);AppData.save(this,data);buyersPage();}catch(Exception ignored){}})
             .setNegativeButton("لغو",null).show();
     }
 
