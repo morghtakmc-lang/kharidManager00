@@ -95,7 +95,7 @@ public class MainActivity extends Activity {
         JSONArray a=AppData.arr(data,"purchases"); int open=0;
         for(int i=0;i<a.length();i++){JSONObject p=a.optJSONObject(i);if(p!=null&&!p.optBoolean("collected",false))open++;}
         s.setText("تعداد خریدها: "+a.length()+"\nخریدهای در انتظار وصول: "+open);
-        Button b=btn("➕ ثبت خرید جدید"); b.setOnClickListener(v->openPage(()->form(null))); add(b);
+        Button b=btn("➕ ثبت خرید جدید"); b.setOnClickListener(v->openPage(this::purchaseTypePage)); add(b);
         b=btn("🛒 خریدهای ثبت‌شده"); b.setOnClickListener(v->openPage(()->listPurchases(null))); add(b);
         b=btn("🏠 واحدها"); b.setOnClickListener(v->openPage(this::buyersPage)); add(b);
         b=btn("💳 تأمین موجودی"); b.setOnClickListener(v->openPage(this::incompleteFundingPage)); add(b);
@@ -186,22 +186,29 @@ public class MainActivity extends Activity {
     boolean validateChainLinks(JSONObject old){
         if(!isChainUnit(unitSp==null?"":String.valueOf(unitSp.getSelectedItem())))return true;
         if(pendingChainLinks.length()==0)return false;
-        double total=0;
         try{
+            HashSet<String> seen=new HashSet<>();
             for(int i=0;i<pendingChainLinks.length();i++){
-                JSONObject x=pendingChainLinks.optJSONObject(i);if(x==null)return false;
-                String unit=x.optString("unitName").trim(),cert=x.optString("certificateNo").trim();
-                double q=toDouble(x.optString("quantity"));
-                if(unit.isEmpty()||cert.isEmpty()||q<=0)return false;
+                JSONObject x=pendingChainLinks.optJSONObject(i);
+                if(x==null)return false;
+                String unit=x.optString("unitName").trim();
+                String cert=x.optString("certificateNo").trim();
+                double chicks=toDouble(x.optString("chickCount"));
+                double cq=toDouble(x.optString("cornQuota"));
+                double sq=toDouble(x.optString("soyQuota"));
+                if(unit.isEmpty()||cert.isEmpty()||chicks<=0||cq<=0||sq<=0)return false;
+                if(!seen.add(unit))return false;
+
                 JSONObject base=certificateBase(unit+"|"+cert,null);
-                if(base==null)return false;
-                double availableC=Math.max(0,quotaOriginal(base,"cornQuota")-usedCorn(unit,cert,null)-transferAmount(unit,cert,"corn"));
-                double availableS=Math.max(0,quotaOriginal(base,"soyQuota")-usedSoy(unit,cert,null)-transferAmount(unit,cert,"soy"));
-                // The link amount is an allocation from the unit's remaining quota.
-                if(q>availableC+availableS+0.001)return false;
-                total+=q;
+                if(base!=null){
+                    double expectedC=quotaOriginal(base,"cornQuota");
+                    double expectedS=quotaOriginal(base,"soyQuota");
+                    if(Math.abs(cq-expectedC)>0.001||Math.abs(sq-expectedS)>0.001)return false;
+                }else{
+                    if(Math.abs(cq-(chicks*2.650))>0.001||Math.abs(sq-(chicks*1.310))>0.001)return false;
+                }
             }
-            return total>0;
+            return true;
         }catch(Exception e){return false;}
     }
 
@@ -216,25 +223,100 @@ public class MainActivity extends Activity {
             Toast.makeText(this,"ابتدا حداقل یک واحد زیرمجموعه برای زنجیره ثبت کنید.",Toast.LENGTH_LONG).show();
             return;
         }
-        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
-        Spinner unit=spinner(opts.toArray(new String[0]));box.addView(unit);
+
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+
+        Spinner unit=spinner(opts.toArray(new String[0]));
+        box.addView(unit);
+
         EditText cert=inputInBox(box,"شماره گواهی بهداشتی واحد");
-        EditText qty=inputInBox(box,"مقدار سهمیه این واحد (کیلوگرم)");
-        qty.setInputType(2|8192);
-        AlertDialog dlg=new AlertDialog.Builder(this).setTitle("افزودن واحد به این خرید زنجیره").setView(box)
-            .setNegativeButton("انصراف",null).setPositiveButton("افزودن",null).create();
+        EditText chicks=inputInBox(box,"تعداد جوجه‌ریزی واحد");
+        chicks.setInputType(2);
+
+        TextView quota=tv("سهمیه ذرت: —\nسهمیه سویا: —",14);
+        quota.setGravity(Gravity.RIGHT);
+        box.addView(quota);
+
+        TextWatcher qtw=new TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int st,int c,int a){}
+            public void onTextChanged(CharSequence s,int st,int b,int c){
+                String d=AppData.digits(chicks.getText().toString()).replace(",","");
+                if(d.isEmpty()){quota.setText("سهمیه ذرت: —\nسهمیه سویا: —");return;}
+                try{
+                    double n=Double.parseDouble(d);
+                    quota.setText("سهمیه ذرت: "+fmtDecimal(n*2.650)+" کیلوگرم\nسهمیه سویا: "+fmtDecimal(n*1.310)+" کیلوگرم");
+                }catch(Exception ignored){
+                    quota.setText("سهمیه ذرت: —\nسهمیه سویا: —");
+                }
+            }
+            public void afterTextChanged(Editable e){}
+        };
+        chicks.addTextChangedListener(qtw);
+
+        AlertDialog dlg=new AlertDialog.Builder(this)
+            .setTitle("افزودن واحد به خرید زنجیره")
+            .setView(box)
+            .setNegativeButton("انصراف",null)
+            .setPositiveButton("افزودن",null)
+            .create();
+
         dlg.setOnShowListener(v->dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(x->{
             String un=String.valueOf(unit.getSelectedItem()).trim();
             String c=cert.getText().toString().trim();
-            double q=toDouble(qty.getText().toString());
-            if(un.isEmpty()||c.isEmpty()||q<=0){Toast.makeText(this,"واحد، شماره گواهی و مقدار را کامل کنید.",Toast.LENGTH_LONG).show();return;}
+            String d=AppData.digits(chicks.getText().toString()).replace(",","");
+
+            if(un.isEmpty()||c.isEmpty()||d.isEmpty()){
+                Toast.makeText(this,"واحد، شماره گواهی و تعداد جوجه‌ریزی را کامل کنید.",Toast.LENGTH_LONG).show();
+                return;
+            }
+
             try{
+                double chickCount=Double.parseDouble(d);
+                if(chickCount<=0){
+                    Toast.makeText(this,"تعداد جوجه‌ریزی باید بیشتر از صفر باشد.",Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                double cornQuota=chickCount*2.650;
+                double soyQuota=chickCount*1.310;
+
+                JSONObject existing=certificateBase(un+"|"+c,null);
+                if(existing!=null){
+                    String oldChicks=existing.optString("chickCount","").trim();
+                    if(!oldChicks.isEmpty() && Math.abs(toDouble(oldChicks)-chickCount)>0.001){
+                        Toast.makeText(this,"این گواهی قبلاً با تعداد جوجه‌ریزی دیگری ثبت شده است.",Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    cornQuota=quotaOriginal(existing,"cornQuota");
+                    soyQuota=quotaOriginal(existing,"soyQuota");
+                }
+
+                // quantity remains the combined quota so the existing linked
+                // statistics continue to work without changing old records.
+                double linkedQuantity=cornQuota+soyQuota;
+
+                for(int i=0;i<pendingChainLinks.length();i++){
+                    JSONObject oldLink=pendingChainLinks.optJSONObject(i);
+                    if(oldLink!=null && un.equals(oldLink.optString("unitName"))){
+                        Toast.makeText(this,"این واحد قبلاً به همین خرید اضافه شده است.",Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                }
+
                 JSONObject link=new JSONObject();
-                link.put("unitName",un);link.put("certificateNo",c);link.put("quantity",fmtDecimal(q));
+                link.put("unitName",un);
+                link.put("certificateNo",c);
+                link.put("chickCount",fmtDecimal(chickCount));
+                link.put("cornQuota",fmtDecimal(cornQuota));
+                link.put("soyQuota",fmtDecimal(soyQuota));
+                link.put("quantity",fmtDecimal(linkedQuantity));
                 pendingChainLinks.put(link);
-                Toast.makeText(this,"واحد به خرید اضافه شد.",Toast.LENGTH_SHORT).show();
+
+                Toast.makeText(this,"واحد و سهمیه آن به خرید اضافه شد.",Toast.LENGTH_SHORT).show();
                 dlg.dismiss();
                 refreshChainLinksPreview();
+                validateForm(null);
             }catch(Exception ignored){}
         }));
         dlg.show();
@@ -255,9 +337,57 @@ public class MainActivity extends Activity {
             if(x==null)continue;
             s.append("🏠 ").append(x.optString("unitName","-"))
              .append(" | گواهی: ").append(x.optString("certificateNo","-"))
-             .append(" | ").append(x.optString("quantity","0")).append(" کیلوگرم\n");
+             .append(" | جوجه‌ریزی: ").append(x.optString("chickCount","-"))
+             .append(" | ذرت: ").append(x.optString("cornQuota","0"))
+             .append(" | سویا: ").append(x.optString("soyQuota","0")).append(" کیلوگرم\n");
         }
         chainLinksPreview.setText(s.toString().trim());
+    }
+
+
+    void purchaseTypePage(){
+        base("نوع خرید را انتخاب کنید");
+
+        Button chain=btn("🔗 خرید زنجیره تک طیور");
+        chain.setOnClickListener(v->openPage(()->formChain(null)));
+        add(chain);
+
+        Button shahed=btn("🐔 خرید شاهدانه طیور");
+        shahed.setOnClickListener(v->{
+            openPage(()->{
+                form(null);
+                setSpinner(unitSp,SHAHEDANEH_UNIT);
+                unitSp.setEnabled(false);
+            });
+        });
+        add(shahed);
+
+        Button independent=btn("🏠 خرید واحد مستقل");
+        independent.setOnClickListener(v->openPage(()->form(null)));
+        add(independent);
+
+        Button back=btn("← بازگشت");
+        back.setOnClickListener(v->back());
+        add(back);
+        finishScreen("نوع خرید");
+    }
+
+    void formChain(JSONObject old){
+        form(old);
+        setSpinner(unitSp,ZANJIREH_UNIT);
+        unitSp.setEnabled(false);
+
+        // In a chain purchase, certificate/chick-count/quota/date fields are
+        // entered per sub-unit below the main form, not once for the chain.
+        if(inputs.size()>=7){
+            for(int i=1;i<=6;i++){
+                inputs.get(i).setVisibility(View.GONE);
+            }
+        }
+        inputs.get(1).setText("چندگانه");
+        if(chainLinksBox!=null)chainLinksBox.setVisibility(View.VISIBLE);
+        refreshChainLinksPreview();
+        validateForm(null);
     }
 
     void form(JSONObject old){
@@ -265,7 +395,16 @@ public class MainActivity extends Activity {
         base(old==null?"ثبت خرید جدید":"ویرایش خرید");inputs.clear();final TextView[] quotaStatusHolder={null}; final TextView[] formLabels=new TextView[labels.length];
         for(int i=0;i<labels.length;i++){
             formLabels[i]=tv((i+1)+". "+labels[i],14); add(formLabels[i]);
-            if(i==0){unitSp=spinnerWithBlank(AppData.arr(data,"units"),"انتخاب واحد");add(unitSp);hidden(); transferSourceLabel=tv("منبع انتقال سهمیه",14); transferSourceLabel.setVisibility(View.GONE); add(transferSourceLabel); transferSourceSp=spinnerWithBlankArray(new String[]{""}); transferSourceSp.setVisibility(View.GONE); add(transferSourceSp);}
+            if(i==0){
+                JSONArray purchaseUnits=new JSONArray();
+                JSONArray allUnits=AppData.arr(data,"units");
+                String oldUnit=old==null?"":old.optString("unit",old.optString("buyer"));
+                for(int ui=0;ui<allUnits.length();ui++){
+                    String un=allUnits.optString(ui);
+                    if(ZANJIREH_UNIT.equals(un)&&!ZANJIREH_UNIT.equals(oldUnit))continue;
+                    purchaseUnits.put(un);
+                }
+                unitSp=spinnerWithBlank(purchaseUnits,"انتخاب واحد");add(unitSp);hidden(); transferSourceLabel=tv("منبع انتقال سهمیه",14); transferSourceLabel.setVisibility(View.GONE); add(transferSourceLabel); transferSourceSp=spinnerWithBlankArray(new String[]{""}); transferSourceSp.setVisibility(View.GONE); add(transferSourceSp);}
             else if(i==7){commoditySp=spinnerWithBlank(AppData.arr(data,"commodities"),"انتخاب نهاده");add(commoditySp);hidden();}
             else if(i==11){
                 paymentSp=spinnerWithBlank(new String[]{"توافقی","نقد"},"انتخاب نوع پرداخت");add(paymentSp);hidden();
@@ -508,7 +647,7 @@ public class MainActivity extends Activity {
         boolean ok=true;
         ok &= markSpinner(unitSp,unitSp!=null&&unitSp.getSelectedItemPosition()>0);ok &= markSpinner(commoditySp,commoditySp!=null&&commoditySp.getSelectedItemPosition()>0);ok &= markSpinner(paymentSp,paymentSp!=null&&paymentSp.getSelectedItemPosition()>0);ok &= markSpinner(companySp,companySp!=null&&companySp.getSelectedItemPosition()>0);
         if(paymentDetailSp!=null&&paymentSp!=null&&paymentSp.getSelectedItemPosition()>0)ok &= markSpinner(paymentDetailSp,paymentDetailSp.getSelectedItemPosition()>0);
-        int[] req=isShahedaneh(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?new int[]{1,5,8,9,10,13,18}:new int[]{1,2,5,8,9,10,13,18};for(int i:req)ok &= markField(inputs.get(i),!inputs.get(i).getText().toString().trim().isEmpty());
+        int[] req=isShahedaneh(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?new int[]{1,5,8,9,10,13,18}:isChainUnit(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?new int[]{8,9,10,13,18}:new int[]{1,2,5,8,9,10,13,18};for(int i:req)ok &= markField(inputs.get(i),!inputs.get(i).getText().toString().trim().isEmpty());
         String cert=inputs.get(1).getText().toString().trim(),unit=unitSp==null?"":String.valueOf(unitSp.getSelectedItem());
         if(cert.isEmpty()||unit.trim().isEmpty())ok=false;
         String ws=AppData.digits(inputs.get(9).getText().toString()),cs=AppData.digits(inputs.get(14).getText().toString()),ss=AppData.digits(inputs.get(15).getText().toString()),ms=AppData.digits(inputs.get(16).getText().toString());
