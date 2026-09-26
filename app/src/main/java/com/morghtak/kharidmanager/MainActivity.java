@@ -374,7 +374,13 @@ public class MainActivity extends Activity {
 
     void formChain(JSONObject old){
         form(old);
-        setSpinner(unitSp,ZANJIREH_UNIT);
+        // Chain purchases have their own fixed root unit. Do not reuse the
+        // independent-unit spinner because that list intentionally excludes the chain.
+        ArrayList<String> chainRoot=new ArrayList<>();
+        chainRoot.add(ZANJIREH_UNIT);
+        ArrayAdapter<String> chainAd=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,chainRoot);
+        unitSp.setAdapter(chainAd);
+        unitSp.setSelection(0);
         unitSp.setEnabled(false);
 
         // In a chain purchase, certificate/chick-count/quota/date fields are
@@ -396,14 +402,7 @@ public class MainActivity extends Activity {
         for(int i=0;i<labels.length;i++){
             formLabels[i]=tv((i+1)+". "+labels[i],14); add(formLabels[i]);
             if(i==0){
-                JSONArray purchaseUnits=new JSONArray();
-                JSONArray allUnits=AppData.arr(data,"units");
-                String oldUnit=old==null?"":old.optString("unit",old.optString("buyer"));
-                for(int ui=0;ui<allUnits.length();ui++){
-                    String un=allUnits.optString(ui);
-                    if(ZANJIREH_UNIT.equals(un)&&!ZANJIREH_UNIT.equals(oldUnit))continue;
-                    purchaseUnits.put(un);
-                }
+                JSONArray purchaseUnits=unitGroup("independent");
                 unitSp=spinnerWithBlank(purchaseUnits,"انتخاب واحد");add(unitSp);hidden(); transferSourceLabel=tv("منبع انتقال سهمیه",14); transferSourceLabel.setVisibility(View.GONE); add(transferSourceLabel); transferSourceSp=spinnerWithBlankArray(new String[]{""}); transferSourceSp.setVisibility(View.GONE); add(transferSourceSp);}
             else if(i==7){commoditySp=spinnerWithBlank(AppData.arr(data,"commodities"),"انتخاب نهاده");add(commoditySp);hidden();}
             else if(i==11){
