@@ -302,12 +302,15 @@ public class MainActivity extends Activity {
         ArrayAdapter<String> chainAd=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,chainRoot);
         unitSp.setAdapter(chainAd);
         unitSp.setSelection(0);
-        unitSp.setEnabled(false);
-
-        // In a chain purchase, certificate/chick-count/quota/date fields are
-        // entered per sub-unit below the main form, not once for the chain.
-        if(inputs.size()>=7){for(int i=1;i<=6;i++)inputs.get(i).setVisibility(View.GONE);}
+        // فقط یک گزینه وجود دارد؛ بنابراین نام زنجیره عملاً غیرقابل تغییر است،
+        // اما ظاهر فیلد مثل فیلدهای عادی باقی می‌ماند و کمرنگ نمی‌شود.
+        unitSp.setEnabled(true);
+        unitSp.setAlpha(1f);
         inputs.get(1).setText("");
+
+        // اطلاعات اختصاصی گواهی از فرم عمومی خرید زنجیره حذف می‌شوند؛
+        // این اطلاعات فقط از پرونده گواهی واحدهای زیرمجموعه خوانده می‌شوند.
+        if(inputs.size()>=7){for(int i=1;i<=6;i++)inputs.get(i).setVisibility(View.GONE);}
         for(int i=0;i<root.getChildCount();i++){
             View v=root.getChildAt(i);
             if(v instanceof TextView){
@@ -315,6 +318,16 @@ public class MainActivity extends Activity {
                 if(t.startsWith("2. گواهی بهداشتی")||t.startsWith("3. تعداد جوجه‌ریزی")||t.startsWith("4. سهمیه ذرت")||t.startsWith("5. سهمیه سویا")||t.startsWith("6. تاریخ جوجه‌ریزی")||t.startsWith("7. تاریخ اعتبار")||t.equals("تاریخ ثبت کارت"))v.setVisibility(View.GONE);
             }
         }
+        // شماره‌گذاری دوباره و پیوسته برای فیلدهای باقی‌مانده فرم زنجیره.
+        int chainNo=1;
+        int[] visibleIndexes={0,7,8,9,10,11,12,13,14,15,16,17,18};
+        for(int idx:visibleIndexes){
+            if(idx<formLabels.length)formLabels[idx].setText((chainNo++)+". "+labels[idx]);
+        }
+        formLabels[0].setText("1. نام زنجیره");
+        formLabels[1].setVisibility(View.GONE);
+        if(cardDateLabel!=null)cardDateLabel.setVisibility(View.GONE);
+        if(cardDateInput!=null)cardDateInput.setVisibility(View.GONE);
         if(chainLinksBox!=null){
             chainLinksBox.setVisibility(View.VISIBLE);
             root.removeView(chainLinksBox);
@@ -576,11 +589,13 @@ public class MainActivity extends Activity {
     }
     boolean validateForm(Button save){
         boolean ok=true;
-        ok &= markSpinner(unitSp,unitSp!=null&&unitSp.getSelectedItemPosition()>0);ok &= markSpinner(commoditySp,commoditySp!=null&&commoditySp.getSelectedItemPosition()>0);ok &= markSpinner(paymentSp,paymentSp!=null&&paymentSp.getSelectedItemPosition()>0);ok &= markSpinner(companySp,companySp!=null&&companySp.getSelectedItemPosition()>0);
+        String validationUnit=unitSp==null?"":String.valueOf(unitSp.getSelectedItem()).trim();
+        boolean unitValid=isChainUnit(validationUnit)|| (unitSp!=null&&unitSp.getSelectedItemPosition()>0);
+        ok &= markSpinner(unitSp,unitValid);ok &= markSpinner(commoditySp,commoditySp!=null&&commoditySp.getSelectedItemPosition()>0);ok &= markSpinner(paymentSp,paymentSp!=null&&paymentSp.getSelectedItemPosition()>0);ok &= markSpinner(companySp,companySp!=null&&companySp.getSelectedItemPosition()>0);
         if(paymentDetailSp!=null&&paymentSp!=null&&paymentSp.getSelectedItemPosition()>0)ok &= markSpinner(paymentDetailSp,paymentDetailSp.getSelectedItemPosition()>0);
         int[] req=isShahedaneh(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?new int[]{1,5,8,9,10,13,18}:isChainUnit(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?new int[]{8,9,10,13,18}:new int[]{1,2,5,8,9,10,13,18};for(int i:req)ok &= markField(inputs.get(i),!inputs.get(i).getText().toString().trim().isEmpty());
         String cert=inputs.get(1).getText().toString().trim(),unit=unitSp==null?"":String.valueOf(unitSp.getSelectedItem());
-        if(cert.isEmpty()||unit.trim().isEmpty())ok=false;
+        if((!isChainUnit(unit)&&cert.isEmpty())||unit.trim().isEmpty())ok=false;
         String ws=AppData.digits(inputs.get(9).getText().toString()),cs=AppData.digits(inputs.get(14).getText().toString()),ss=AppData.digits(inputs.get(15).getText().toString()),ms=AppData.digits(inputs.get(16).getText().toString());
         boolean nums=!ws.isEmpty()&&!cs.isEmpty()&&!ss.isEmpty()&&!ms.isEmpty();
         if(nums){try{double w=Double.parseDouble(ws),c=Double.parseDouble(cs),so=Double.parseDouble(ss),mi=Double.parseDouble(ms);boolean match=Math.abs((c+so+mi)-w)<0.001;markField(inputs.get(9),match);markField(inputs.get(14),match);markField(inputs.get(15),match);markField(inputs.get(16),match);ok&=match;}catch(Exception e){ok=false;}}
@@ -1124,10 +1139,19 @@ public class MainActivity extends Activity {
     }
     void registerCertificateDialog(String unit){
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);
-        EditText cert=inputInBox(box,"شماره گواهی بهداشتی");
-        EditText chicks=inputInBox(box,"تعداد جوجه‌ریزی");chicks.setInputType(2);
-        EditText placement=inputInBox(box,"تاریخ جوجه‌ریزی");placement.setText(PersianDate.today());placement.setFocusable(false);placement.setOnClickListener(v->pickDate(placement));
-        EditText card=inputInBox(box,"تاریخ ثبت کارت");card.setText(PersianDate.today());card.setFocusable(false);card.setOnClickListener(v->pickDate(card));
+
+        TextView certLabel=tv("شماره گواهی بهداشتی",14);certLabel.setGravity(Gravity.RIGHT);box.addView(certLabel);
+        EditText cert=inputInBox(box,"");
+
+        TextView chicksLabel=tv("تعداد جوجه‌ریزی",14);chicksLabel.setGravity(Gravity.RIGHT);box.addView(chicksLabel);
+        EditText chicks=inputInBox(box,"");chicks.setInputType(2);
+
+        TextView placementLabel=tv("تاریخ جوجه‌ریزی",14);placementLabel.setGravity(Gravity.RIGHT);box.addView(placementLabel);
+        EditText placement=inputInBox(box,"");placement.setText(PersianDate.today());placement.setFocusable(false);placement.setOnClickListener(v->pickDate(placement));
+
+        TextView cardLabel=tv("تاریخ ثبت کارت",14);cardLabel.setGravity(Gravity.RIGHT);box.addView(cardLabel);
+        EditText card=inputInBox(box,"");card.setText(PersianDate.today());card.setFocusable(false);card.setOnClickListener(v->pickDate(card));
+
         TextView quota=tv("سهمیه ذرت: —\nسهمیه سویا: —\nتاریخ اعتبار: —",14);quota.setGravity(Gravity.RIGHT);box.addView(quota);
         chicks.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){String d=AppData.digits(s.toString()).replace(",","");try{double n=Double.parseDouble(d);quota.setText("سهمیه ذرت: "+fmtDecimal(n*2.650)+" کیلوگرم\nسهمیه سویا: "+fmtDecimal(n*1.310)+" کیلوگرم\nتاریخ اعتبار: "+addPersianDays(placement.getText().toString().trim(),60));}catch(Exception e){quota.setText("سهمیه ذرت: —\nسهمیه سویا: —\nتاریخ اعتبار: —");}}public void afterTextChanged(Editable e){}});
         AlertDialog dlg=new AlertDialog.Builder(this).setTitle("ثبت گواهی بهداشتی جدید").setMessage("واحد: "+unit).setView(box).setNegativeButton("انصراف",null).setPositiveButton("ثبت",null).create();
@@ -1151,6 +1175,23 @@ public class MainActivity extends Activity {
         ArrayList<JSONObject> noColl=new ArrayList<>(),noAlloc=new ArrayList<>(),noFund=new ArrayList<>();
         HashSet<String> certKeys=new HashSet<>();
         ArrayList<String> incompleteCerts=new ArrayList<>();
+
+        // همه گواهی‌های ثبت‌شده برای این واحد، حتی اگر هنوز خریدی از آنها انجام نشده باشد،
+        // در آمار واحد لحاظ می‌شوند و به‌صورت پرونده قابل مشاهده هستند.
+        JSONArray registeredCerts=data.optJSONArray("certificates");
+        if(registeredCerts!=null){
+            for(int i=0;i<registeredCerts.length();i++){
+                JSONObject cb=registeredCerts.optJSONObject(i);if(cb==null||!buyer.equals(cb.optString("unit")))continue;
+                String cert=cb.optString("healthCertificate").trim();if(cert.isEmpty())continue;
+                String ck=buyer+"|"+cert;if(!certKeys.add(ck))continue;
+                double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");
+                double rc=Math.max(0,cq-usedCorn(buyer,cert,null)-transferAmount(buyer,cert,"corn"));
+                double rs=Math.max(0,sq-usedSoy(buyer,cert,null)-transferAmount(buyer,cert,"soy"));
+                initialCorn+=cq; purchasedCorn+=usedCorn(buyer,cert,null); transferredCorn+=transferAmount(buyer,cert,"corn"); remainingCorn+=rc;
+                initialSoy+=sq; purchasedSoy+=usedSoy(buyer,cert,null); transferredSoy+=transferAmount(buyer,cert,"soy"); remainingSoy+=rs;
+                boolean complete=rc<=0.0001&&rs<=0.0001;if(complete)fullQuota++;else incompleteCerts.add(cert);
+            }
+        }
 
         for(int i=0;i<a.length();i++){
             JSONObject p=a.optJSONObject(i);if(p==null||!buyer.equals(p.optString("unit",p.optString("buyer"))))continue;
@@ -1204,6 +1245,21 @@ public class MainActivity extends Activity {
         add(tv("شماره‌های وصول‌نشده",15));addPurchaseNumberList(noColl);
         add(tv("شماره‌های تخصیص‌نشده",15));addPurchaseNumberList(noAlloc);
         add(tv("شماره‌های تأمین ناقص",15));addPurchaseNumberList(noFund);
+
+        add(tv("گواهی‌های بهداشتی ثبت‌شده",15));
+        boolean hasRegisteredCert=false;
+        if(registeredCerts!=null){
+            for(int i=0;i<registeredCerts.length();i++){
+                JSONObject cb=registeredCerts.optJSONObject(i);if(cb==null||!buyer.equals(cb.optString("unit")))continue;
+                String cert=cb.optString("healthCertificate").trim();if(cert.isEmpty())continue;hasRegisteredCert=true;
+                double cq=quotaOriginal(cb,"cornQuota"),sq=quotaOriginal(cb,"soyQuota");
+                double rc=Math.max(0,cq-usedCorn(buyer,cert,null)-transferAmount(buyer,cert,"corn"));
+                double rs=Math.max(0,sq-usedSoy(buyer,cert,null)-transferAmount(buyer,cert,"soy"));
+                Button certBtn=btn("📁 گواهی بهداشتی "+cert+"\nجوجه‌ریزی: "+cb.optString("chickCount","-")+" | ذرت: "+fmtDecimal(cq)+" | سویا: "+fmtDecimal(sq)+" کیلوگرم");
+                certBtn.setOnClickListener(v->openPage(()->certificateFile(buyer,cert)));add(certBtn);
+            }
+        }
+        if(!hasRegisteredCert)add(tv("هنوز گواهی بهداشتی ثبت نشده است.",14));
 
         add(tv("گواهی‌های بهداشتی دارای مانده سهمیه",15));
         if(incompleteCerts.isEmpty())add(tv("ندارد",14));
