@@ -239,7 +239,7 @@ public class MainActivity extends Activity {
             for(int i=0;i<pendingChainLinks.length();i++){JSONObject oldLink=pendingChainLinks.optJSONObject(i);if(oldLink!=null&&un.equals(oldLink.optString("unitName"))){Toast.makeText(this,"این واحد قبلاً به همین خرید اضافه شده است.",Toast.LENGTH_LONG).show();return;}}
             try{
                 JSONObject link=new JSONObject();link.put("unitName",un);link.put("certificateNo",c);link.put("chickCount",cb.optString("chickCount",""));link.put("cornQuota",fmtDecimal(quotaOriginal(cb,"cornQuota")));link.put("soyQuota",fmtDecimal(quotaOriginal(cb,"soyQuota")));link.put("quantity",fmtDecimal(quotaOriginal(cb,"cornQuota")+quotaOriginal(cb,"soyQuota")));pendingChainLinks.put(link);
-                dlg.dismiss();refreshChainLinksPreview();validateForm(null);Toast.makeText(this,"واحد و گواهی ثبت‌شده به خرید اضافه شد.",Toast.LENGTH_SHORT).show();
+                dlg.dismiss();refreshChainLinksPreview();refreshChainQuotaSummary();validateForm(null);Toast.makeText(this,"واحد و گواهی ثبت‌شده به خرید اضافه شد.",Toast.LENGTH_SHORT).show();
             }catch(Exception ignored){}
         }));dlg.show();
     }
@@ -249,6 +249,7 @@ public class MainActivity extends Activity {
     }
 
     TextView chainLinksPreview;
+    TextView chainQuotaSummary;
     LinearLayout chainLinksBox;
     void refreshChainLinksPreview(){
         if(chainLinksPreview==null)return;
@@ -263,6 +264,19 @@ public class MainActivity extends Activity {
              .append(" | سویا: ").append(x.optString("soyQuota","0")).append(" کیلوگرم\n");
         }
         chainLinksPreview.setText(s.toString().trim());
+    }
+
+    void refreshChainQuotaSummary(){
+        if(chainQuotaSummary==null)return;
+        double corn=0,soy=0;
+        for(int i=0;i<pendingChainLinks.length();i++){
+            JSONObject x=pendingChainLinks.optJSONObject(i);
+            if(x==null)continue;
+            corn+=toDouble(x.optString("cornQuota"));
+            soy+=toDouble(x.optString("soyQuota"));
+        }
+        chainQuotaSummary.setText("سهمیه ذرت: "+fmtDecimal(corn)+" کیلوگرم\nسهمیه سویا: "+fmtDecimal(soy)+" کیلوگرم");
+        chainQuotaSummary.setGravity(Gravity.RIGHT);
     }
 
 
@@ -343,7 +357,12 @@ public class MainActivity extends Activity {
             root.removeView(chainLinksBox);
             root.addView(chainLinksBox,1);
         }
-        refreshChainLinksPreview();
+        if(chainQuotaSummary!=null){
+            chainQuotaSummary.setVisibility(View.VISIBLE);
+            root.removeView(chainQuotaSummary);
+            root.addView(chainQuotaSummary,2);
+        }
+        refreshChainLinksPreview();refreshChainQuotaSummary();
         validateForm(null);
     }
 
@@ -417,7 +436,9 @@ public class MainActivity extends Activity {
         TextView chainTitle=tv("تخصیص این خرید به واحدهای زیرمجموعه",16);chainTitle.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));chainLinksBox.addView(chainTitle);
         Button linkBtn=btn("➕ افزودن واحد زیرمجموعه و گواهی");linkBtn.setOnClickListener(v->chainLinksDialog());chainLinksBox.addView(linkBtn);
         chainLinksPreview=tv("هنوز واحدی به این خرید متصل نشده است.",14);chainLinksPreview.setGravity(Gravity.RIGHT);chainLinksBox.addView(chainLinksPreview);
-        chainLinksBox.setVisibility(isChainUnit(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?View.VISIBLE:View.GONE);add(chainLinksBox);refreshChainLinksPreview();
+        chainLinksBox.setVisibility(isChainUnit(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?View.VISIBLE:View.GONE);add(chainLinksBox);
+        chainQuotaSummary=tv("سهمیه ذرت: 0 کیلوگرم\nسهمیه سویا: 0 کیلوگرم",15);chainQuotaSummary.setGravity(Gravity.RIGHT);chainQuotaSummary.setVisibility(View.GONE);add(chainQuotaSummary);
+        refreshChainLinksPreview();refreshChainQuotaSummary();
         add(tv("هشدار بر اساس تاریخ سررسید",16));
         LinearLayout al=new LinearLayout(this);al.setOrientation(LinearLayout.VERTICAL);add(al);
         EditText days=new EditText(this);days.setHint("چند روز قبل از سررسید؟");days.setInputType(2);al.addView(days);
