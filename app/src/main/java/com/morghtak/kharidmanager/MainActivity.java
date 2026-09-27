@@ -363,6 +363,21 @@ public class MainActivity extends Activity {
             root.addView(chainQuotaSummary,2);
         }
         refreshChainLinksPreview();refreshChainQuotaSummary();
+        // محاسبه ترکیب نهاده در خرید زنجیره باید دقیقاً همان منطق فرم عمومی را داشته باشد.
+        // با تغییر نهاده یا وزن، ذرت/سویا/ریز مغذی و افت فوراً محاسبه و نمایش داده می‌شوند.
+        if(inputs.size()>16){
+            TextWatcher chainCompositionWatcher=new TextWatcher(){
+                public void beforeTextChanged(CharSequence s,int st,int c,int a){}
+                public void onTextChanged(CharSequence s,int st,int b,int c){}
+                public void afterTextChanged(Editable e){calcPurchaseComposition();validateForm(null);}
+            };
+            inputs.get(9).addTextChangedListener(chainCompositionWatcher);
+            if(commoditySp!=null) commoditySp.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+                public void onNothingSelected(AdapterView<?> p){}
+                public void onItemSelected(AdapterView<?> p,View v,int pos,long id){calcPurchaseComposition();validateForm(null);}
+            });
+            calcPurchaseComposition();
+        }
         validateForm(null);
     }
 
