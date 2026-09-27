@@ -293,6 +293,8 @@ public class MainActivity extends Activity {
         finishScreen("نوع خرید");
     }
 
+    TextView[] formLabels;
+
     void formChain(JSONObject old){
         form(old);
         // Chain purchases have their own fixed root unit. Do not reuse the
@@ -318,14 +320,22 @@ public class MainActivity extends Activity {
                 if(t.startsWith("2. گواهی بهداشتی")||t.startsWith("3. تعداد جوجه‌ریزی")||t.startsWith("4. سهمیه ذرت")||t.startsWith("5. سهمیه سویا")||t.startsWith("6. تاریخ جوجه‌ریزی")||t.startsWith("7. تاریخ اعتبار")||t.equals("تاریخ ثبت کارت"))v.setVisibility(View.GONE);
             }
         }
-        // شماره‌گذاری دوباره و پیوسته برای فیلدهای باقی‌مانده فرم زنجیره.
+        // شماره‌گذاری دوباره و پیوسته برای فیلدهای باقی‌مانده فرم زنجیره،
+        // بدون وابستگی به آرایه‌ای خارج از محدوده این متد.
         int chainNo=1;
-        int[] visibleIndexes={0,7,8,9,10,11,12,13,14,15,16,17,18};
-        for(int idx:visibleIndexes){
-            if(idx<formLabels.length)formLabels[idx].setText((chainNo++)+". "+labels[idx]);
+        for(int i=0;i<root.getChildCount();i++){
+            View v=root.getChildAt(i);
+            if(!(v instanceof TextView))continue;
+            TextView tv=(TextView)v;
+            if(tv.getVisibility()!=View.VISIBLE)continue;
+            String text=tv.getText().toString();
+            for(int j=0;j<labels.length;j++){
+                if(text.equals((j+1)+". "+labels[j])){
+                    tv.setText((chainNo++)+". "+(j==0?"نام زنجیره":labels[j]));
+                    break;
+                }
+            }
         }
-        formLabels[0].setText("1. نام زنجیره");
-        formLabels[1].setVisibility(View.GONE);
         if(cardDateLabel!=null)cardDateLabel.setVisibility(View.GONE);
         if(cardDateInput!=null)cardDateInput.setVisibility(View.GONE);
         if(chainLinksBox!=null){
@@ -339,7 +349,7 @@ public class MainActivity extends Activity {
 
     void form(JSONObject old){
         formOldPurchase=old; loadPendingChainLinks(old);
-        base(old==null?"ثبت خرید جدید":"ویرایش خرید");inputs.clear();final TextView[] quotaStatusHolder={null}; final TextView[] formLabels=new TextView[labels.length];
+        base(old==null?"ثبت خرید جدید":"ویرایش خرید");inputs.clear();final TextView[] quotaStatusHolder={null}; formLabels=new TextView[labels.length];
         for(int i=0;i<labels.length;i++){
             formLabels[i]=tv((i+1)+". "+labels[i],14); add(formLabels[i]);
             if(i==0){
