@@ -316,7 +316,9 @@ public class MainActivity extends Activity {
             double purchaseCorn=inputs.size()>15?toDouble(inputs.get(14).getText().toString()):0;
             double purchaseSoy=inputs.size()>15?toDouble(inputs.get(15).getText().toString()):0;
             for(int i=0;i<pendingChainLinks.length();i++){JSONObject z=pendingChainLinks.optJSONObject(i);if(z!=null&&(!z.has("cornUsed")||!z.has("soyUsed"))){legacyLinks=true;break;}}
-            if(!legacyLinks&&(Math.abs(totalCorn-purchaseCorn)>0.001||Math.abs(totalSoy-purchaseSoy)>0.001))return false;
+            // The per-unit quota allocations are independent from the purchase composition.
+            // The purchase weight/composition is validated by validateForm(), while these
+            // values only describe how much quota from each linked certificate is consumed.
             for(int i=0;i<pendingChainLinks.length();i++){
                 JSONObject x=pendingChainLinks.optJSONObject(i);
                 if(x==null)return false;
