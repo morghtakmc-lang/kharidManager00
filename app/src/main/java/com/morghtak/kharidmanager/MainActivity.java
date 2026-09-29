@@ -446,15 +446,14 @@ public class MainActivity extends Activity {
         for(int i=0;i<pendingChainLinks.length();i++){
             JSONObject x=pendingChainLinks.optJSONObject(i);
             if(x==null)continue;
-            String unit=x.optString("unitName","").trim(), cert=x.optString("certificateNo","").trim();
-            double cq=toDouble(x.optString("cornQuota","0"));
-            double sq=toDouble(x.optString("soyQuota","0"));
-            double consumedC=Math.max(0,usedCorn(unit,cert,formOldPurchase)-chainLinkUsedFromPendingBefore(i,"corn",unit,cert));
-            double consumedS=Math.max(0,usedSoy(unit,cert,formOldPurchase)-chainLinkUsedFromPendingBefore(i,"soy",unit,cert));
-            corn+=Math.max(0,cq-consumedC-transferAmount(unit,cert,"corn"));
-            soy+=Math.max(0,sq-consumedS-transferAmount(unit,cert,"soy"));
+            // در کادر زرد فقط «مصرف این خرید» واحدهای اضافه‌شده جمع می‌شود.
+            corn += Math.max(0,toDouble(x.optString("cornUsed","0")));
+            soy  += Math.max(0,toDouble(x.optString("soyUsed","0")));
         }
-        chainQuotaSummary.setText("سهمیه قابل خرید ذرت: "+fmtDecimal(corn)+" کیلوگرم\nسهمیه قابل خرید سویا: "+fmtDecimal(soy)+" کیلوگرم");
+        double weight=corn+soy;
+        chainQuotaSummary.setText("سهمیه قابل خرید ذرت: "+fmtDecimal(corn)+" کیلوگرم\n"
+                +"سهمیه قابل خرید سویا: "+fmtDecimal(soy)+" کیلوگرم\n"
+                +"وزن قابل خرید: "+fmtDecimal(weight)+" کیلوگرم");
         chainQuotaSummary.setGravity(Gravity.RIGHT);
     }
 
@@ -631,7 +630,7 @@ public class MainActivity extends Activity {
         Button linkBtn=btn("➕ افزودن واحد زیرمجموعه و گواهی");linkBtn.setOnClickListener(v->chainLinksDialog());chainLinksBox.addView(linkBtn);
         chainLinksPreview=tv("هنوز واحدی به این خرید متصل نشده است.",14);chainLinksPreview.setGravity(Gravity.RIGHT);chainLinksBox.addView(chainLinksPreview);
         chainLinksBox.setVisibility(isChainUnit(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?View.VISIBLE:View.GONE);add(chainLinksBox);
-        chainQuotaSummary=tv("سهمیه قابل خرید ذرت: 0 کیلوگرم\nسهمیه قابل خرید سویا: 0 کیلوگرم",15);chainQuotaSummary.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);chainQuotaSummary.setPadding(UiManager.dp(this,14),UiManager.dp(this,12),UiManager.dp(this,14),UiManager.dp(this,12));chainQuotaSummary.setTypeface(Typeface.DEFAULT,Typeface.BOLD);chainQuotaSummary.setTextColor(REF_YELLOW_TEXT);chainQuotaSummary.setBackground(refBg(REF_YELLOW,Color.rgb(238,218,130),16));chainQuotaSummary.setVisibility(View.GONE);add(chainQuotaSummary);
+        chainQuotaSummary=tv("سهمیه قابل خرید ذرت: 0 کیلوگرم\nسهمیه قابل خرید سویا: 0 کیلوگرم\nوزن قابل خرید: 0 کیلوگرم",15);chainQuotaSummary.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);chainQuotaSummary.setPadding(UiManager.dp(this,14),UiManager.dp(this,12),UiManager.dp(this,14),UiManager.dp(this,12));chainQuotaSummary.setTypeface(Typeface.DEFAULT,Typeface.BOLD);chainQuotaSummary.setTextColor(REF_YELLOW_TEXT);chainQuotaSummary.setBackground(refBg(REF_YELLOW,Color.rgb(238,218,130),16));chainQuotaSummary.setVisibility(View.GONE);add(chainQuotaSummary);
         refreshChainLinksPreview();refreshChainQuotaSummary();
         add(tv("هشدار بر اساس تاریخ سررسید",16));
         LinearLayout al=new LinearLayout(this);al.setOrientation(LinearLayout.VERTICAL);add(al);
