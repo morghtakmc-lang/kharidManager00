@@ -388,7 +388,7 @@ public class MainActivity extends Activity {
                 double cu=toDouble(cornUsed.getText().toString()),su=toDouble(soyUsed.getText().toString());
                 if(cu<0||su<0||cu>remC+0.001||su>remS+0.001){Toast.makeText(this,"مقدار مصرفی از سهمیه این واحد بیشتر از مانده قابل استفاده است.",Toast.LENGTH_LONG).show();return;}
                 JSONObject link=new JSONObject();link.put("unitName",un);link.put("certificateNo",c);link.put("chickCount",cb.optString("chickCount",""));link.put("cornQuota",fmtDecimal(cq));link.put("soyQuota",fmtDecimal(sq));link.put("cornUsed",fmtDecimal(cu));link.put("soyUsed",fmtDecimal(su));link.put("quantity",fmtDecimal(cq+sq));pendingChainLinks.put(link);
-                dlg.dismiss();refreshChainLinksPreview();refreshChainQuotaSummary();validateForm(null);Toast.makeText(this,"واحد، گواهی و مقدار مصرف سهمیه به خرید اضافه شد.",Toast.LENGTH_SHORT).show();
+                dlg.dismiss();refreshChainLinksPreview();refreshChainQuotaSummary();validateForm(chainSaveButton);Toast.makeText(this,"واحد، گواهی و مقدار مصرف سهمیه به خرید اضافه شد.",Toast.LENGTH_SHORT).show();
             }catch(Exception ignored){}
         }));dlg.show();
     }
@@ -397,6 +397,7 @@ public class MainActivity extends Activity {
         EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));e.setPadding(14,8,14,8);box.addView(e);return e;
     }
 
+    Button chainSaveButton;
     TextView chainLinksPreview;
     TextView chainQuotaSummary;
     LinearLayout chainLinksBox;
@@ -616,7 +617,7 @@ public class MainActivity extends Activity {
         TextWatcher aw=new TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int b,int c){}public void onTextChanged(CharSequence s,int a,int b,int c){updateAlarmStatus(preview,days.getText().toString(),time.getText().toString(),inputs.get(18).getText().toString());}public void afterTextChanged(Editable e){}};
         days.addTextChangedListener(aw);time.addTextChangedListener(aw);inputs.get(18).addTextChangedListener(aw);
         Button clear=btn("🔕 حذف هشدار");clear.setOnClickListener(v->{days.setText("");time.setText("");updateAlarmStatus(preview,"","",inputs.get(18).getText().toString());if(old!=null){try{old.remove("alarm");old.remove("alarmRepeat");}catch(Exception ignored){}cancelAlarm(this,old);}});add(clear);
-        Button save=btn("✓ ذخیره خرید و هشدار");save.setOnClickListener(v->savePurchase(old,days.getText().toString(),time.getText().toString(),repeat.getSelectedItemPosition()==1,save));add(save);
+        Button save=btn("✓ ذخیره خرید و هشدار"); chainSaveButton=save; save.setOnClickListener(v->savePurchase(old,days.getText().toString(),time.getText().toString(),repeat.getSelectedItemPosition()==1,save));add(save);
         Button back=btn("← بازگشت");back.setOnClickListener(v->back());add(back);
         finishScreen(old==null?"ثبت خرید جدید":"ویرایش خرید");
         updateAlarmStatus(preview,days.getText().toString(),time.getText().toString(),inputs.get(18).getText().toString());setupValidationListeners(save);validateForm(save);
