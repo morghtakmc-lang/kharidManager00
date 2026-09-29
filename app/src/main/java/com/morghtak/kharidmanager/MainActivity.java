@@ -410,15 +410,34 @@ public class MainActivity extends Activity {
         for(int i=0;i<pendingChainLinks.length();i++){
             JSONObject x=pendingChainLinks.optJSONObject(i);
             if(x==null)continue;
-            s.append("🏠 ").append(x.optString("unitName","-"))
-             .append(" | گواهی: ").append(x.optString("certificateNo","-"))
-             .append("\nسهمیه ذرت: ").append(x.optString("cornQuota","0"))
-             .append(" | مصرف این خرید: ").append(x.optString("cornUsed","0"))
-             .append(" | سهمیه سویا: ").append(x.optString("soyQuota","0"))
-             .append(" | مصرف این خرید: ").append(x.optString("soyUsed","0"))
-             .append(" کیلوگرم\n");
+            String unit=x.optString("unitName","").trim(), cert=x.optString("certificateNo","").trim();
+            double cq=toDouble(x.optString("cornQuota","0"));
+            double sq=toDouble(x.optString("soyQuota","0"));
+            double cu=toDouble(x.optString("cornUsed","0"));
+            double su=toDouble(x.optString("soyUsed","0"));
+            double consumedC=Math.max(0,usedCorn(unit,cert,formOldPurchase)-chainLinkUsedFromPendingBefore(i,"corn",unit,cert));
+            double consumedS=Math.max(0,usedSoy(unit,cert,formOldPurchase)-chainLinkUsedFromPendingBefore(i,"soy",unit,cert));
+            double availableC=Math.max(0,cq-consumedC-transferAmount(unit,cert,"corn"));
+            double availableS=Math.max(0,sq-consumedS-transferAmount(unit,cert,"soy"));
+            double remainC=Math.max(0,availableC-cu);
+            double remainS=Math.max(0,availableS-su);
+            s.append("🏠 ").append(unit).append(" | گواهی: ").append(cert)
+             .append("\nذرت — سهمیه اولیه: ").append(fmtDecimal(cq)).append(" | مصرف شده: ").append(fmtDecimal(consumedC))
+             .append(" | مصرف این خرید: ").append(fmtDecimal(cu)).append(" | مانده: ").append(fmtDecimal(remainC)).append(" کیلوگرم")
+             .append("\nسویا — سهمیه اولیه: ").append(fmtDecimal(sq)).append(" | مصرف شده: ").append(fmtDecimal(consumedS))
+             .append(" | مصرف این خرید: ").append(fmtDecimal(su)).append(" | مانده: ").append(fmtDecimal(remainS)).append(" کیلوگرم\n");
         }
         chainLinksPreview.setText(s.toString().trim());
+    }
+
+    double chainLinkUsedFromPendingBefore(int index,String commodity,String unit,String cert){
+        double s=0;String key="corn".equals(commodity)?"cornUsed":"soyUsed";
+        for(int i=0;i<index&&i<pendingChainLinks.length();i++){
+            JSONObject x=pendingChainLinks.optJSONObject(i);
+            if(x==null)continue;
+            if(unit.equals(x.optString("unitName").trim())&&cert.equals(x.optString("certificateNo").trim()))s+=toDouble(x.optString(key,"0"));
+        }
+        return s;
     }
 
     void refreshChainQuotaSummary(){
@@ -427,10 +446,15 @@ public class MainActivity extends Activity {
         for(int i=0;i<pendingChainLinks.length();i++){
             JSONObject x=pendingChainLinks.optJSONObject(i);
             if(x==null)continue;
-            corn+=toDouble(x.optString("cornQuota"));
-            soy+=toDouble(x.optString("soyQuota"));
+            String unit=x.optString("unitName","").trim(), cert=x.optString("certificateNo","").trim();
+            double cq=toDouble(x.optString("cornQuota","0"));
+            double sq=toDouble(x.optString("soyQuota","0"));
+            double consumedC=Math.max(0,usedCorn(unit,cert,formOldPurchase)-chainLinkUsedFromPendingBefore(i,"corn",unit,cert));
+            double consumedS=Math.max(0,usedSoy(unit,cert,formOldPurchase)-chainLinkUsedFromPendingBefore(i,"soy",unit,cert));
+            corn+=Math.max(0,cq-consumedC-transferAmount(unit,cert,"corn"));
+            soy+=Math.max(0,sq-consumedS-transferAmount(unit,cert,"soy"));
         }
-        chainQuotaSummary.setText("سهمیه ذرت: "+fmtDecimal(corn)+" کیلوگرم\nسهمیه سویا: "+fmtDecimal(soy)+" کیلوگرم");
+        chainQuotaSummary.setText("سهمیه قابل خرید این خرید — ذرت: "+fmtDecimal(corn)+" کیلوگرم\nسهمیه قابل خرید این خرید — سویا: "+fmtDecimal(soy)+" کیلوگرم");
         chainQuotaSummary.setGravity(Gravity.RIGHT);
     }
 
@@ -607,7 +631,7 @@ public class MainActivity extends Activity {
         Button linkBtn=btn("➕ افزودن واحد زیرمجموعه و گواهی");linkBtn.setOnClickListener(v->chainLinksDialog());chainLinksBox.addView(linkBtn);
         chainLinksPreview=tv("هنوز واحدی به این خرید متصل نشده است.",14);chainLinksPreview.setGravity(Gravity.RIGHT);chainLinksBox.addView(chainLinksPreview);
         chainLinksBox.setVisibility(isChainUnit(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?View.VISIBLE:View.GONE);add(chainLinksBox);
-        chainQuotaSummary=tv("سهمیه ذرت: 0 کیلوگرم\nسهمیه سویا: 0 کیلوگرم",15);chainQuotaSummary.setGravity(Gravity.RIGHT);chainQuotaSummary.setVisibility(View.GONE);add(chainQuotaSummary);
+        chainQuotaSummary=tv("سهمیه قابل خرید این خرید — ذرت: 0 کیلوگرم\nسهمیه قابل خرید این خرید — سویا: 0 کیلوگرم",15);chainQuotaSummary.setGravity(Gravity.RIGHT);chainQuotaSummary.setVisibility(View.GONE);add(chainQuotaSummary);
         refreshChainLinksPreview();refreshChainQuotaSummary();
         add(tv("هشدار بر اساس تاریخ سررسید",16));
         LinearLayout al=new LinearLayout(this);al.setOrientation(LinearLayout.VERTICAL);add(al);
