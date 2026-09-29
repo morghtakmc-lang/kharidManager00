@@ -126,12 +126,12 @@ public class MainActivity extends Activity {
     }
 
     // --- Reference UI theme: blue cards, rounded controls, compact metric blocks and clean tables. ---
-    static final int REF_BLUE=Color.rgb(0,113,234);
-    static final int REF_BLUE_DARK=Color.rgb(0,83,170);
-    static final int REF_BLUE_LIGHT=Color.rgb(235,246,255);
-    static final int REF_BORDER=Color.rgb(190,218,242);
-    static final int REF_TEXT=Color.rgb(20,55,90);
-    static final int REF_GREEN=Color.rgb(221,246,225);
+    static final int REF_BLUE=Color.rgb(8,132,96);
+    static final int REF_BLUE_DARK=Color.rgb(5,103,75);
+    static final int REF_BLUE_LIGHT=Color.rgb(232,247,240);
+    static final int REF_BORDER=Color.rgb(185,220,207);
+    static final int REF_TEXT=Color.rgb(25,65,54);
+    static final int REF_GREEN=Color.rgb(220,246,226);
     static final int REF_GREEN_TEXT=Color.rgb(35,125,55);
     static final int REF_YELLOW=Color.rgb(255,247,194);
     static final int REF_YELLOW_TEXT=Color.rgb(105,82,0);
