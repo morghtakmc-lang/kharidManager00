@@ -116,42 +116,114 @@ public class MainActivity extends Activity {
     void base(String title){
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.WHITE);
-        root.setPadding(UiManager.dp(this,20),UiManager.dp(this,10),UiManager.dp(this,20),UiManager.dp(this,12));
-        TextView h=tv(title,21);h.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
-        h.setTextColor(UiManager.text(this));
-        h.setTypeface(UiManager.selectedTypeface(this,Typeface.NORMAL));
-        h.setPadding(UiManager.dp(this,22),0,UiManager.dp(this,22),0);
-        GradientDrawable hb=new GradientDrawable();hb.setColor(UiManager.primary(this));hb.setCornerRadius(UiManager.dp(this,38));
-        h.setBackground(hb);
-        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,UiManager.dp(this,66));
-        hp.bottomMargin=UiManager.dp(this,18);
-        root.addView(h,hp);setContentView(root);
+        TextView h=tv(title,21);h.setGravity(Gravity.CENTER);
+        root.addView(h,new LinearLayout.LayoutParams(-1,UiManager.dp(this,64)));setContentView(root);
     }
-    void finishScreen(String title){UiManager.decorate(this,root,title);hideKeyboard();}
+    void finishScreen(String title){
+        UiManager.decorate(this,root,title);
+        applyReferenceTheme(root,title);
+        hideKeyboard();
+    }
+
+    // --- Reference UI theme: blue cards, rounded controls, compact metric blocks and clean tables. ---
+    static final int REF_BLUE=Color.rgb(0,113,234);
+    static final int REF_BLUE_DARK=Color.rgb(0,83,170);
+    static final int REF_BLUE_LIGHT=Color.rgb(235,246,255);
+    static final int REF_BORDER=Color.rgb(190,218,242);
+    static final int REF_TEXT=Color.rgb(20,55,90);
+    static final int REF_GREEN=Color.rgb(221,246,225);
+    static final int REF_GREEN_TEXT=Color.rgb(35,125,55);
+    static final int REF_YELLOW=Color.rgb(255,247,194);
+    static final int REF_YELLOW_TEXT=Color.rgb(105,82,0);
+    static final int REF_PURPLE=Color.rgb(238,229,255);
+    static final int REF_PURPLE_TEXT=Color.rgb(93,55,155);
+    static final int REF_GRAY=Color.rgb(235,241,246);
+    static final int REF_RED=Color.rgb(220,45,55);
+
+    GradientDrawable refBg(int fill,int stroke,int radius){
+        GradientDrawable g=new GradientDrawable();
+        g.setColor(fill);g.setCornerRadius(UiManager.dp(this,radius));
+        if(stroke!=Color.TRANSPARENT)g.setStroke(UiManager.dp(this,1),stroke);
+        return g;
+    }
+    boolean hasText(View v,String part){return v instanceof TextView && String.valueOf(((TextView)v).getText()).contains(part);}
+    void applyReferenceTheme(View rootView,String title){
+        if(rootView==null)return;
+        if(rootView instanceof ViewGroup) styleReferenceChildren((ViewGroup)rootView,true);
+        rootView.setBackgroundColor(Color.WHITE);
+    }
+    void styleReferenceChildren(ViewGroup parent,boolean top){
+        for(int i=0;i<parent.getChildCount();i++){
+            View v=parent.getChildAt(i);
+            if(v instanceof ViewGroup) styleReferenceChildren((ViewGroup)v,false);
+            styleReferenceView(v,parent,i);
+        }
+    }
+    void styleReferenceView(View v,ViewGroup parent,int index){
+        if(v instanceof Button){
+            Button b=(Button)v;String t=String.valueOf(b.getText());
+            b.setAllCaps(false);b.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));
+            b.setTextSize(Math.max(13,UiManager.buttonSize(this)-1));
+            b.setMinHeight(UiManager.dp(this,50));
+            b.setPadding(UiManager.dp(this,12),UiManager.dp(this,6),UiManager.dp(this,12),UiManager.dp(this,6));
+            int fill=REF_BLUE,stroke=REF_BLUE;
+            int text=Color.WHITE;
+            if(t.contains("حذف")||t.contains("🗑")){fill=Color.WHITE;stroke=REF_RED;text=REF_RED;}
+            else if(t.contains("بازگشت")){fill=REF_BLUE_LIGHT;stroke=REF_BORDER;text=REF_BLUE_DARK;}
+            else if(t.contains("خرید شاهدانه")){fill=REF_GREEN;stroke=Color.rgb(150,210,160);text=REF_GREEN_TEXT;}
+            else if(t.contains("خرید واحد مستقل")){fill=REF_PURPLE;stroke=Color.rgb(190,160,235);text=REF_PURPLE_TEXT;}
+            b.setBackground(refBg(fill,stroke,22));b.setTextColor(text);
+            return;
+        }
+        if(v instanceof EditText){
+            EditText e=(EditText)v;
+            e.setTextColor(REF_TEXT);e.setHintTextColor(Color.rgb(125,145,165));
+            e.setTextSize(UiManager.fieldSize(this));e.setSingleLine(e.getMaxLines()==1);
+            e.setPadding(UiManager.dp(this,14),UiManager.dp(this,8),UiManager.dp(this,14),UiManager.dp(this,8));
+            if(e.getVisibility()!=View.GONE)e.setBackground(refBg(Color.WHITE,REF_BORDER,18));
+            return;
+        }
+        if(v instanceof Spinner){
+            Spinner sp=(Spinner)v;
+            sp.setBackground(refBg(Color.WHITE,REF_BORDER,18));
+            return;
+        }
+        if(v instanceof CheckBox){
+            CheckBox c=(CheckBox)v;c.setTextColor(REF_TEXT);c.setTextSize(UiManager.bodySize(this));
+            c.setPadding(UiManager.dp(this,8),UiManager.dp(this,6),UiManager.dp(this,8),UiManager.dp(this,6));
+            return;
+        }
+        if(v instanceof TextView){
+            TextView t=(TextView)v;
+            String s=String.valueOf(t.getText());
+            t.setTextColor(REF_TEXT);
+            if(index==0 && parent==root){
+                t.setTextColor(Color.WHITE);t.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));
+                t.setTextSize(Math.max(18,UiManager.titleSize(this)-1));t.setGravity(Gravity.CENTER);
+                t.setBackground(refBg(REF_BLUE_DARK,REF_BLUE_DARK,30));
+                t.setPadding(UiManager.dp(this,16),0,UiManager.dp(this,16),0);
+                parent.setPadding(UiManager.dp(this,10),UiManager.dp(this,8),UiManager.dp(this,10),UiManager.dp(this,8));
+            } else if(parent instanceof TableRow){
+                boolean header=(parent.getParent() instanceof TableLayout && parent.getChildAt(0)==parent);
+                t.setGravity(Gravity.CENTER);t.setPadding(UiManager.dp(this,6),UiManager.dp(this,7),UiManager.dp(this,6),UiManager.dp(this,7));
+                t.setTextSize(header?11:10);t.setTypeface(UiManager.selectedTypeface(this,header?Typeface.BOLD:Typeface.NORMAL));
+                t.setTextColor(header?Color.WHITE:REF_TEXT);
+                t.setBackground(refBg(header?REF_BLUE:Color.WHITE,REF_BORDER,4));
+            }
+            if(s.contains("سهمیه ذرت")||s.contains("🌽")){t.setBackground(refBg(REF_YELLOW,Color.rgb(238,218,130),12));t.setTextColor(REF_YELLOW_TEXT);}
+            else if(s.contains("سهمیه سویا")||s.contains("🌱")){t.setBackground(refBg(REF_GREEN,Color.rgb(155,215,165),12));t.setTextColor(REF_GREEN_TEXT);}
+            else if(s.contains("ریز مغذی")){t.setBackground(refBg(REF_PURPLE,Color.rgb(195,170,235),12));t.setTextColor(REF_PURPLE_TEXT);}
+            else if(s.contains("افت")){t.setBackground(refBg(REF_GRAY,REF_BORDER,12));t.setTextColor(REF_TEXT);}
+        }
+    }
     void hideKeyboard(){try{((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(root.getWindowToken(),0);}catch(Exception ignored){}}
-    void add(View v){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT);lp.bottomMargin=UiManager.dp(this,8);root.addView(v,lp);}
-    TextView tv(String s,int z){TextView t=new TextView(this);t.setText(s);t.setTextSize(z);t.setPadding(18,12,18,12);t.setTextColor(UiManager.text(this));return t;}
-    GradientDrawable roundedBg(int color,int strokeColor,int strokeDp,int radiusDp){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(UiManager.dp(this,radiusDp));if(strokeDp>0)g.setStroke(UiManager.dp(this,strokeDp),strokeColor);return g;}
-    Button btn(String s){
-        Button b=new Button(this);b.setText(s);b.setAllCaps(false);
-        b.setTextSize(Math.max(15,UiManager.buttonSize(this)));
-        b.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));
-        b.setTextColor(Color.WHITE);b.setGravity(Gravity.CENTER);
-        b.setPadding(UiManager.dp(this,18),UiManager.dp(this,4),UiManager.dp(this,18),UiManager.dp(this,4));
-        b.setMinHeight(UiManager.dp(this,58));
-        b.setBackground(roundedBg(UiManager.primary(this),UiManager.primary(this),1,32));
-        return b;
-    }
-    EditText input(String hint){
-        EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));
-        e.setTextColor(UiManager.text(this));e.setHintTextColor(Color.rgb(120,120,120));
-        e.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);e.setPadding(UiManager.dp(this,16),0,UiManager.dp(this,16),0);
-        e.setMinHeight(UiManager.dp(this,58));e.setBackground(roundedBg(Color.WHITE,Color.rgb(220,235,231),1,30));
-        inputs.add(e);add(e);return e;
-    }
-    void label(String s){TextView t=tv(s,15);t.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);t.setTypeface(UiManager.selectedTypeface(this,Typeface.NORMAL));t.setPadding(UiManager.dp(this,4),UiManager.dp(this,8),UiManager.dp(this,4),UiManager.dp(this,5));add(t);}
+    void add(View v){root.addView(v,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));}
+    TextView tv(String s,int z){TextView t=new TextView(this);t.setText(s);t.setTextSize(z);t.setPadding(18,12,18,12);return t;}
+    Button btn(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);return b;}
+    EditText input(String hint){EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));e.setPadding(14,8,14,8);inputs.add(e);add(e);return e;}
+    void label(String s){add(tv(s,14));}
     Spinner spinner(JSONArray a){ArrayList<String>x=new ArrayList<>();for(int i=0;i<a.length();i++)x.add(a.optString(i));return spinner(x.toArray(new String[0]));}
-    Spinner spinner(String[] a){Spinner s=new Spinner(this);s.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,a));s.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);s.setMinimumHeight(UiManager.dp(this,58));s.setBackground(roundedBg(Color.WHITE,Color.rgb(220,235,231),1,30));return s;}
+    Spinner spinner(String[] a){Spinner s=new Spinner(this);s.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,a));return s;}
     void setSpinner(Spinner s,String v){if(s==null)return;for(int i=0;i<s.getCount();i++)if(String.valueOf(s.getItemAtPosition(i)).equals(v)){s.setSelection(i);break;}}
     void hidden(){EditText e=new EditText(this);e.setVisibility(View.GONE);inputs.add(e);}
     void addGrouping(EditText e){e.addTextChangedListener(new TextWatcher(){boolean busy;public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){}public void afterTextChanged(Editable ed){if(busy)return;String r=AppData.digits(ed.toString());if(r.isEmpty())return;busy=true;String f=AppData.fmt(r);e.setText(f);e.setSelection(f.length());busy=false;}});}
@@ -270,10 +342,7 @@ public class MainActivity extends Activity {
     }
 
     EditText inputInBox(LinearLayout box,String hint){
-        EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));
-        e.setTextColor(UiManager.text(this));e.setHintTextColor(Color.rgb(120,120,120));e.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
-        e.setPadding(UiManager.dp(this,16),0,UiManager.dp(this,16),0);e.setMinHeight(UiManager.dp(this,58));
-        e.setBackground(roundedBg(Color.WHITE,Color.rgb(220,235,231),1,30));box.addView(e);return e;
+        EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));e.setPadding(14,8,14,8);box.addView(e);return e;
     }
 
     TextView chainLinksPreview;
@@ -682,7 +751,7 @@ public class MainActivity extends Activity {
     }
     boolean markField(EditText e,boolean valid){e.setBackground(fieldBg(valid));return valid;}
     boolean markSpinner(Spinner s,boolean valid){if(s!=null)s.setBackground(fieldBg(valid));return valid;}
-    GradientDrawable fieldBg(boolean valid){GradientDrawable g=new GradientDrawable();g.setColor(Color.WHITE);g.setCornerRadius(UiManager.dp(this,30));g.setStroke(UiManager.dp(this,1),valid?Color.rgb(220,235,231):Color.rgb(180,45,55));return g;}
+    GradientDrawable fieldBg(boolean valid){GradientDrawable g=new GradientDrawable();g.setColor(UiManager.card(this));g.setCornerRadius(UiManager.dp(this,UiManager.radius(this)));g.setStroke(UiManager.dp(this,1),valid?UiManager.secondary(this):Color.rgb(210,50,50));return g;}
     boolean checkQuotaLimits(JSONObject old){
         String unit=unitSp==null?"":String.valueOf(unitSp.getSelectedItem()),cert=inputs.get(1).getText().toString().trim();
         if(unit.trim().isEmpty())return false;
@@ -841,9 +910,16 @@ public class MainActivity extends Activity {
     }
 
     LinearLayout summaryMetric(String title,String value){
-        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setGravity(Gravity.CENTER);box.setPadding(UiManager.dp(this,8),UiManager.dp(this,10),UiManager.dp(this,8),UiManager.dp(this,10));
-        TextView t=tv(title,12);t.setGravity(Gravity.CENTER);t.setTextColor(UiManager.text(this));t.setMaxLines(2);
-        TextView v=tv(value,16);v.setGravity(Gravity.CENTER);v.setTextColor(UiManager.primary(this));v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));v.setMaxLines(2);
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setGravity(Gravity.CENTER);
+        box.setPadding(UiManager.dp(this,8),UiManager.dp(this,8),UiManager.dp(this,8),UiManager.dp(this,8));
+        int fill=REF_BLUE_LIGHT,stroke=REF_BORDER,text=REF_TEXT;
+        if(title.contains("ذرت")||title.contains("🌽")){fill=REF_YELLOW;stroke=Color.rgb(238,218,130);text=REF_YELLOW_TEXT;}
+        else if(title.contains("سویا")||title.contains("🌱")){fill=REF_GREEN;stroke=Color.rgb(155,215,165);text=REF_GREEN_TEXT;}
+        else if(title.contains("ریز مغذی")){fill=REF_PURPLE;stroke=Color.rgb(195,170,235);text=REF_PURPLE_TEXT;}
+        else if(title.contains("افت")){fill=REF_GRAY;stroke=REF_BORDER;}
+        box.setBackground(refBg(fill,stroke,12));
+        TextView t=tv(title,12);t.setGravity(Gravity.CENTER);t.setTextColor(text);t.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));t.setMaxLines(2);
+        TextView v=tv(value,16);v.setGravity(Gravity.CENTER);v.setTextColor(text);v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));v.setMaxLines(2);
         box.addView(t,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));box.addView(v,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));return box;
     }
 
