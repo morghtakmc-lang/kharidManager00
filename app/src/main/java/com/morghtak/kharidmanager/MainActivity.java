@@ -40,12 +40,6 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
-        // ظاهر یکپارچه برنامه: نوار وضعیت هم‌رنگ سربرگ اصلی
-        try{
-            getWindow().setStatusBarColor(Color.rgb(8,137,100));
-            getWindow().setNavigationBarColor(Color.WHITE);
-            if(Build.VERSION.SDK_INT>=23)getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        }catch(Exception ignored){}
         data=AppData.root(this);
         normalizeData();
         rescheduleAll();
@@ -122,31 +116,42 @@ public class MainActivity extends Activity {
     void base(String title){
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.WHITE);
-        TextView h=tv(title,21);
-        h.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
-        h.setTextColor(Color.WHITE);
-        h.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));
-        h.setPadding(UiManager.dp(this,24),0,UiManager.dp(this,24),0);
-        GradientDrawable hg=new GradientDrawable();
-        hg.setColor(Color.rgb(8,137,100));
-        hg.setCornerRadius(UiManager.dp(this,32));
-        h.setBackground(hg);
-        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,UiManager.dp(this,64));
-        hp.setMargins(UiManager.dp(this,2),UiManager.dp(this,2),UiManager.dp(this,2),UiManager.dp(this,16));
-        root.addView(h,hp);
-        setContentView(root);
+        root.setPadding(UiManager.dp(this,20),UiManager.dp(this,10),UiManager.dp(this,20),UiManager.dp(this,12));
+        TextView h=tv(title,21);h.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        h.setTextColor(UiManager.text(this));
+        h.setTypeface(UiManager.selectedTypeface(this,Typeface.NORMAL));
+        h.setPadding(UiManager.dp(this,22),0,UiManager.dp(this,22),0);
+        GradientDrawable hb=new GradientDrawable();hb.setColor(UiManager.primary(this));hb.setCornerRadius(UiManager.dp(this,38));
+        h.setBackground(hb);
+        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,UiManager.dp(this,66));
+        hp.bottomMargin=UiManager.dp(this,18);
+        root.addView(h,hp);setContentView(root);
     }
-    void finishScreen(String title){UiManager.decorate(this,root,title);try{root.setBackgroundColor(Color.WHITE);}catch(Exception ignored){}hideKeyboard();}
+    void finishScreen(String title){UiManager.decorate(this,root,title);hideKeyboard();}
     void hideKeyboard(){try{((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(root.getWindowToken(),0);}catch(Exception ignored){}}
-    GradientDrawable uiButtonBg(){GradientDrawable g=new GradientDrawable();g.setColor(Color.rgb(8,137,100));g.setCornerRadius(UiManager.dp(this,30));return g;}
-    GradientDrawable uiFieldBg(boolean valid){GradientDrawable g=new GradientDrawable();g.setColor(Color.WHITE);g.setCornerRadius(UiManager.dp(this,28));g.setStroke(UiManager.dp(this,1),valid?Color.rgb(224,234,231):Color.rgb(185,58,58));return g;}
-    void add(View v){root.addView(v,new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT));}
-    TextView tv(String s,int z){TextView t=new TextView(this);t.setText(s);t.setTextSize(z);t.setTextColor(UiManager.text(this));t.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);t.setPadding(UiManager.dp(this,8),UiManager.dp(this,10),UiManager.dp(this,8),UiManager.dp(this,10));return t;}
-    Button btn(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextColor(Color.WHITE);b.setTextSize(Math.max(14,UiManager.buttonSize(this)));b.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));b.setGravity(Gravity.CENTER);b.setMinHeight(UiManager.dp(this,56));b.setPadding(UiManager.dp(this,16),UiManager.dp(this,8),UiManager.dp(this,16),UiManager.dp(this,8));b.setBackground(uiButtonBg());b.setElevation(UiManager.dp(this,2));return b;}
-    EditText input(String hint){EditText e=new EditText(this);e.setHint(hint);e.setHintTextColor(Color.rgb(150,160,157));e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));e.setTextColor(UiManager.text(this));e.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);e.setPadding(UiManager.dp(this,16),UiManager.dp(this,8),UiManager.dp(this,16),UiManager.dp(this,8));e.setBackground(uiFieldBg(true));inputs.add(e);add(e);return e;}
-    void label(String s){TextView t=tv(s,14);t.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);add(t);}
+    void add(View v){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,ViewGroup.LayoutParams.WRAP_CONTENT);lp.bottomMargin=UiManager.dp(this,8);root.addView(v,lp);}
+    TextView tv(String s,int z){TextView t=new TextView(this);t.setText(s);t.setTextSize(z);t.setPadding(18,12,18,12);t.setTextColor(UiManager.text(this));return t;}
+    GradientDrawable roundedBg(int color,int strokeColor,int strokeDp,int radiusDp){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(UiManager.dp(this,radiusDp));if(strokeDp>0)g.setStroke(UiManager.dp(this,strokeDp),strokeColor);return g;}
+    Button btn(String s){
+        Button b=new Button(this);b.setText(s);b.setAllCaps(false);
+        b.setTextSize(Math.max(15,UiManager.buttonSize(this)));
+        b.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));
+        b.setTextColor(Color.WHITE);b.setGravity(Gravity.CENTER);
+        b.setPadding(UiManager.dp(this,18),UiManager.dp(this,4),UiManager.dp(this,18),UiManager.dp(this,4));
+        b.setMinHeight(UiManager.dp(this,58));
+        b.setBackground(roundedBg(UiManager.primary(this),UiManager.primary(this),1,32));
+        return b;
+    }
+    EditText input(String hint){
+        EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));
+        e.setTextColor(UiManager.text(this));e.setHintTextColor(Color.rgb(120,120,120));
+        e.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);e.setPadding(UiManager.dp(this,16),0,UiManager.dp(this,16),0);
+        e.setMinHeight(UiManager.dp(this,58));e.setBackground(roundedBg(Color.WHITE,Color.rgb(220,235,231),1,30));
+        inputs.add(e);add(e);return e;
+    }
+    void label(String s){TextView t=tv(s,15);t.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);t.setTypeface(UiManager.selectedTypeface(this,Typeface.NORMAL));t.setPadding(UiManager.dp(this,4),UiManager.dp(this,8),UiManager.dp(this,4),UiManager.dp(this,5));add(t);}
     Spinner spinner(JSONArray a){ArrayList<String>x=new ArrayList<>();for(int i=0;i<a.length();i++)x.add(a.optString(i));return spinner(x.toArray(new String[0]));}
-    Spinner spinner(String[] a){Spinner s=new Spinner(this);s.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,a));return s;}
+    Spinner spinner(String[] a){Spinner s=new Spinner(this);s.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,a));s.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);s.setMinimumHeight(UiManager.dp(this,58));s.setBackground(roundedBg(Color.WHITE,Color.rgb(220,235,231),1,30));return s;}
     void setSpinner(Spinner s,String v){if(s==null)return;for(int i=0;i<s.getCount();i++)if(String.valueOf(s.getItemAtPosition(i)).equals(v)){s.setSelection(i);break;}}
     void hidden(){EditText e=new EditText(this);e.setVisibility(View.GONE);inputs.add(e);}
     void addGrouping(EditText e){e.addTextChangedListener(new TextWatcher(){boolean busy;public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){}public void afterTextChanged(Editable ed){if(busy)return;String r=AppData.digits(ed.toString());if(r.isEmpty())return;busy=true;String f=AppData.fmt(r);e.setText(f);e.setSelection(f.length());busy=false;}});}
@@ -265,7 +270,10 @@ public class MainActivity extends Activity {
     }
 
     EditText inputInBox(LinearLayout box,String hint){
-        EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));e.setPadding(14,8,14,8);box.addView(e);return e;
+        EditText e=new EditText(this);e.setHint(hint);e.setSingleLine(true);e.setTextSize(UiManager.fieldSize(this));
+        e.setTextColor(UiManager.text(this));e.setHintTextColor(Color.rgb(120,120,120));e.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        e.setPadding(UiManager.dp(this,16),0,UiManager.dp(this,16),0);e.setMinHeight(UiManager.dp(this,58));
+        e.setBackground(roundedBg(Color.WHITE,Color.rgb(220,235,231),1,30));box.addView(e);return e;
     }
 
     TextView chainLinksPreview;
@@ -581,7 +589,7 @@ public class MainActivity extends Activity {
 
     Spinner spinnerWithBlank(JSONArray a,String placeholder){ArrayList<String>x=new ArrayList<>();x.add("");for(int i=0;i<a.length();i++)x.add(a.optString(i));return spinnerWithBlankArray(x.toArray(new String[0]));}
     Spinner spinnerWithBlank(String[] a,String placeholder){ArrayList<String>x=new ArrayList<>();x.add("");Collections.addAll(x,a);return spinnerWithBlankArray(x.toArray(new String[0]));}
-    Spinner spinnerWithBlankArray(String[] x){Spinner s=new Spinner(this);ArrayAdapter<String> ad=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,x){@Override public View getView(int position,View convertView,android.view.ViewGroup parent){TextView v=(TextView)super.getView(position,convertView,parent);v.setText(position==0?"":String.valueOf(getItem(position)));v.setTextColor(UiManager.text(MainActivity.this));v.setTextSize(UiManager.fieldSize(MainActivity.this));v.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);v.setPadding(UiManager.dp(MainActivity.this,16),UiManager.dp(MainActivity.this,8),UiManager.dp(MainActivity.this,16),UiManager.dp(MainActivity.this,8));return v;}};s.setAdapter(ad);s.setBackground(uiFieldBg(true));s.setPadding(UiManager.dp(this,4),0,UiManager.dp(this,4),0);return s;}
+    Spinner spinnerWithBlankArray(String[] x){Spinner s=new Spinner(this);ArrayAdapter<String> ad=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,x){@Override public View getView(int position,View convertView,android.view.ViewGroup parent){TextView v=(TextView)super.getView(position,convertView,parent);v.setText(position==0?"":String.valueOf(getItem(position)));return v;}};s.setAdapter(ad);return s;}
 
     void updateQuotaFields(){
         if(inputs.size()<7)return;
@@ -674,7 +682,7 @@ public class MainActivity extends Activity {
     }
     boolean markField(EditText e,boolean valid){e.setBackground(fieldBg(valid));return valid;}
     boolean markSpinner(Spinner s,boolean valid){if(s!=null)s.setBackground(fieldBg(valid));return valid;}
-    GradientDrawable fieldBg(boolean valid){return uiFieldBg(valid); }
+    GradientDrawable fieldBg(boolean valid){GradientDrawable g=new GradientDrawable();g.setColor(Color.WHITE);g.setCornerRadius(UiManager.dp(this,30));g.setStroke(UiManager.dp(this,1),valid?Color.rgb(220,235,231):Color.rgb(180,45,55));return g;}
     boolean checkQuotaLimits(JSONObject old){
         String unit=unitSp==null?"":String.valueOf(unitSp.getSelectedItem()),cert=inputs.get(1).getText().toString().trim();
         if(unit.trim().isEmpty())return false;
@@ -881,7 +889,7 @@ public class MainActivity extends Activity {
         GradientDrawable g=new GradientDrawable();g.setColor(header?UiManager.primary(this):UiManager.card(this));g.setStroke(UiManager.dp(this,1),UiManager.secondary(this));v.setBackground(g);
         v.setTextColor(header?Color.WHITE:(success?UiManager.primary(this):UiManager.text(this)));if(success)v.setTypeface(UiManager.selectedTypeface(this,Typeface.BOLD));return v;
     }
-    Button miniAction(String text){Button b=btn(text);b.setTextSize(12);b.setPadding(0,0,0,0);b.setMinWidth(UiManager.dp(this,30));b.setMinHeight(UiManager.dp(this,36));b.setMinimumHeight(UiManager.dp(this,36));GradientDrawable g=new GradientDrawable();g.setColor(Color.WHITE);g.setCornerRadius(UiManager.dp(this,18));g.setStroke(UiManager.dp(this,1),Color.rgb(8,137,100));b.setBackground(g);b.setTextColor(UiManager.primary(this));b.setElevation(0);return b;}
+    Button miniAction(String text){Button b=btn(text);b.setTextSize(12);b.setPadding(0,0,0,0);b.setMinWidth(UiManager.dp(this,30));b.setMinHeight(UiManager.dp(this,36));return b;}
 
     JSONArray sortedPurchases(){JSONArray src=AppData.arr(data,"purchases");ArrayList<JSONObject> l=new ArrayList<>();for(int i=0;i<src.length();i++)l.add(src.optJSONObject(i));Collections.sort(l,(a,b)->b.optString("buyDate").compareTo(a.optString("buyDate")));JSONArray r=new JSONArray();for(JSONObject p:l)r.put(p);return r;}
 
