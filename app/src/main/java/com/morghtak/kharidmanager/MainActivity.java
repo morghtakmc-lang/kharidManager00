@@ -454,7 +454,7 @@ public class MainActivity extends Activity {
             corn+=Math.max(0,cq-consumedC-transferAmount(unit,cert,"corn"));
             soy+=Math.max(0,sq-consumedS-transferAmount(unit,cert,"soy"));
         }
-        chainQuotaSummary.setText("سهمیه قابل خرید این خرید — ذرت: "+fmtDecimal(corn)+" کیلوگرم\nسهمیه قابل خرید این خرید — سویا: "+fmtDecimal(soy)+" کیلوگرم");
+        chainQuotaSummary.setText("سهمیه قابل خرید ذرت: "+fmtDecimal(corn)+" کیلوگرم\nسهمیه قابل خرید سویا: "+fmtDecimal(soy)+" کیلوگرم");
         chainQuotaSummary.setGravity(Gravity.RIGHT);
     }
 
@@ -631,7 +631,7 @@ public class MainActivity extends Activity {
         Button linkBtn=btn("➕ افزودن واحد زیرمجموعه و گواهی");linkBtn.setOnClickListener(v->chainLinksDialog());chainLinksBox.addView(linkBtn);
         chainLinksPreview=tv("هنوز واحدی به این خرید متصل نشده است.",14);chainLinksPreview.setGravity(Gravity.RIGHT);chainLinksBox.addView(chainLinksPreview);
         chainLinksBox.setVisibility(isChainUnit(unitSp==null?"":String.valueOf(unitSp.getSelectedItem()))?View.VISIBLE:View.GONE);add(chainLinksBox);
-        chainQuotaSummary=tv("سهمیه قابل خرید این خرید — ذرت: 0 کیلوگرم\nسهمیه قابل خرید این خرید — سویا: 0 کیلوگرم",15);chainQuotaSummary.setGravity(Gravity.RIGHT);chainQuotaSummary.setVisibility(View.GONE);add(chainQuotaSummary);
+        chainQuotaSummary=tv("سهمیه قابل خرید ذرت: 0 کیلوگرم\nسهمیه قابل خرید سویا: 0 کیلوگرم",15);chainQuotaSummary.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);chainQuotaSummary.setPadding(UiManager.dp(this,14),UiManager.dp(this,12),UiManager.dp(this,14),UiManager.dp(this,12));chainQuotaSummary.setTypeface(Typeface.DEFAULT,Typeface.BOLD);chainQuotaSummary.setTextColor(REF_YELLOW_TEXT);chainQuotaSummary.setBackground(refBg(REF_YELLOW,Color.rgb(238,218,130),16));chainQuotaSummary.setVisibility(View.GONE);add(chainQuotaSummary);
         refreshChainLinksPreview();refreshChainQuotaSummary();
         add(tv("هشدار بر اساس تاریخ سررسید",16));
         LinearLayout al=new LinearLayout(this);al.setOrientation(LinearLayout.VERTICAL);add(al);
